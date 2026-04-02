@@ -60,13 +60,13 @@ The system uses a **prompt-based AI model** instead of training a custom ML mode
 
 ---
 
-## 🌐 Live Demo
+## Live Demo
 
-- 📥 Submit Article: [https://forms.gle/your-link](https://docs.google.com/forms/d/e/1FAIpQLSekTYlCbvBiw49xURxPcA24q5Yxc_x-6S25u49RNXEECJ78Jg/viewform)
+- Submit Article: [https://forms.gle/your-link](https://docs.google.com/forms/d/e/1FAIpQLSekTYlCbvBiw49xURxPcA24q5Yxc_x-6S25u49RNXEECJ78Jg/viewform)
 
 ---
 
-## 🚀 Future Work
+## Future Work
 - Accuracy evaluation using labeled dataset
 - Precision/Recall calculation
 - Source credibility scoring system
