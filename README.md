@@ -62,7 +62,7 @@ The system uses a **prompt-based AI model** instead of training a custom ML mode
 
 ## 🌐 Live Demo
 
-- 📥 Submit Article: https://forms.gle/your-link
+- 📥 Submit Article: [https://forms.gle/your-link](https://docs.google.com/forms/d/e/1FAIpQLSekTYlCbvBiw49xURxPcA24q5Yxc_x-6S25u49RNXEECJ78Jg/viewform)
 
 ---
 
