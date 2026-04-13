@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Fake News & Misinformation Detector</title>
+    <meta name="description" content="AI-powered text analysis and fact-checking using ChatGPT for real/fake classification.">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="glass-background"></div>
+    <div class="blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <nav class="navbar">
+        <div class="logo">
+            <i class="fa-solid fa-shield-halved"></i>
+            <span>TruthLens AI</span>
+        </div>
+        <div class="nav-links">
+            <a href="#" class="active">Dashboard</a>
+            <a href="#">Knowledge Map</a>
+            <a href="#">API Config</a>
+        </div>
+    </nav>
+
+    <main class="dashboard-container">
+        <!-- Input Section -->
+        <section class="input-section glass-panel">
+            <div class="panel-header">
+                <h2><i class="fa-solid fa-wand-magic-sparkles"></i> AI Analysis Input</h2>
+                <p>Enter the news headline or article text below for fact-checking and sentiment analysis.</p>
+            </div>
+            
+            <form id="analysis-form">
+                <div class="form-group">
+                    <label for="headline">Headline / Source URL</label>
+                    <input type="text" id="headline" placeholder="e.g. Breaking: Scientists Discover New Planet or https://news.com/article" required>
+                </div>
+                <div class="form-group">
+                    <label for="article-text">Article Content</label>
+                    <textarea id="article-text" rows="6" placeholder="Paste the full article content here for deep NLP analysis..." required></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary" id="analyze-btn">
+                        <span>Analyze Context</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                    <button type="button" class="btn-secondary" id="clear-btn">Clear</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Loading State -->
+        <div class="loading-state hidden" id="loading">
+            <div class="loader"></div>
+            <h3>Running ChatGPT AI Models...</h3>
+            <p>Cross-referencing trusted vs flagged sources & analyzing sentiment...</p>
+        </div>
+
+        <!-- Dashboard Results Section -->
+        <section class="results-section hidden" id="results">
+            <div class="results-grid">
+                
+                <!-- Main Verdict -->
+                <div class="result-card verdict-card glass-panel" id="verdict-container">
+                    <h3>Overall Verdict</h3>
+                    <div class="verdict-display">
+                        <div class="verdict-icon" id="verdict-icon">
+                            <i class="fa-solid fa-check-circle"></i>
+                        </div>
+                        <h1 id="verdict-text">Likely Real</h1>
+                    </div>
+                    <div class="confidence-meter-container">
+                        <div class="confidence-header">
+                            <span>AI Confidence Score</span>
+                            <span id="confidence-score">92%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="confidence-fill"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Source Credibility -->
+                <div class="result-card credibility-card glass-panel">
+                    <h3><i class="fa-solid fa-building-columns"></i> Source Credibility Assessment</h3>
+                    <div class="source-score-container">
+                        <div class="donut-chart-wrapper">
+                            <canvas id="credibilityChart"></canvas>
+                            <div class="chart-center" id="credibility-center">85</div>
+                        </div>
+                        <div class="source-details">
+                            <p id="source-status" class="status positive">Trusted Source</p>
+                            <ul>
+                                <li><strong>Domain Pattern:</strong> <span id="domain-pattern">Standard News Format</span></li>
+                                <li><strong>Knowledge Map:</strong> <span id="knowledge-map">Matches trusted databases</span></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sentiment Analysis -->
+                <div class="result-card sentiment-card glass-panel">
+                    <h3><i class="fa-solid fa-masks-theater"></i> Emotional & Sentiment Analysis</h3>
+                    <div class="sentiment-bars">
+                        <div class="sentiment-item">
+                            <div class="s-head">
+                                <span>Manipulative Language</span>
+                                <span id="manipulative-score">15%</span>
+                            </div>
+                            <div class="progress-bar"><div class="progress-fill warning" id="manipulative-fill" style="width: 15%"></div></div>
+                        </div>
+                        <div class="sentiment-item">
+                            <div class="s-head">
+                                <span>Sensationalism</span>
+                                <span id="sensationalism-score">25%</span>
+                            </div>
+                            <div class="progress-bar"><div class="progress-fill warning" id="sensationalism-fill" style="width: 25%"></div></div>
+                        </div>
+                        <div class="sentiment-item">
+                            <div class="s-head">
+                                <span>Objectivity</span>
+                                <span id="objectivity-score">80%</span>
+                            </div>
+                            <div class="progress-bar"><div class="progress-fill positive" id="objectivity-fill" style="width: 80%"></div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fact Check Details -->
+                <div class="result-card full-width fact-check-card glass-panel">
+                    <h3><i class="fa-solid fa-list-check"></i> AI Text Analysis Insights</h3>
+                    <div class="insights-grid">
+                        <div class="insight-item">
+                            <i class="fa-solid fa-quote-left"></i>
+                            <h4>Misinformation Flags</h4>
+                            <p id="misinfo-flags">No major red flags detected. The article uses neutral reporting styles without excessive hyperbole.</p>
+                        </div>
+                        <div class="insight-item">
+                            <i class="fa-solid fa-magnifying-glass-chart"></i>
+                            <h4>Dataset Validation</h4>
+                            <p id="dataset-validation">Compared against 26,000+ examples in our True/Fake databases. High coherence with verified events.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="disclaimer">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <strong>Ethical AI Disclaimer:</strong> This system uses AI and NLP for analysis. It cannot replace human judgment and may occasionally misclassify novel scenarios. Use these metrics as an aid, not absolute truth.
+                    </div>
+                </div>
+
+            </div>
+        </section>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
