@@ -10,7 +10,7 @@ datasource db {
 model Analysis {
   id                  String   @id @default(cuid())
   headline            String
-  content            String
+  content             String
   isLikelyFake        Boolean
   confidenceScore     Float
   sourceCredibility   Float
@@ -18,4 +18,14 @@ model Analysis {
   sensationalismScore Float
   objectivityScore    Float
   createdAt           DateTime @default(now())
+}
+
+model TrustedSource {
+  id          String   @id @default(cuid())
+  domain      String   @unique
+  name        String
+  trustScore  Float    // 0 to 100
+  isFlagged   Boolean  @default(false)
+  category    String   // e.g., "Mainstream", "Satire", "Propaganda"
+  updatedAt   DateTime @updatedAt
 }
