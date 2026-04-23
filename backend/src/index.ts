@@ -2,9 +2,9 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
+import { FakeNewsAgent } from './agent';
 import fs from 'fs';
 import path from 'path';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
 dotenv.config();
 
@@ -19,138 +19,27 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-
-// Load RAG Knowledge Base
-const datasetPath = path.join(__dirname, 'dataset.json');
-let KNOWLEDGE_BASE: any[] = [];
-try {
-    const data = fs.readFileSync(datasetPath, 'utf8');
-    KNOWLEDGE_BASE = JSON.parse(data);
-    console.log(`✅ RAG Knowledge Base loaded: ${KNOWLEDGE_BASE.length} entries`);
-} catch (err) {
-    console.error('⚠️ Failed to load RAG Dataset:', err);
-}
-
-// RAG: Retrieve most relevant examples from the knowledge base
-const retrieveContext = (input: string): any[] => {
-    const STOP_WORDS = new Set(['the', 'is', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'of', 'are', 'was', 'were', 'be', 'has', 'had', 'he', 'she', 'it', 'they', 'we', 'you', 'i']);
-    const inputWords = input.toLowerCase().split(/\W+/).filter(w => w.length > 3 && !STOP_WORDS.has(w));
-    
-    if (inputWords.length === 0) return [];
-
-    const scored = KNOWLEDGE_BASE.map(item => {
-        const itemText = item.text.toLowerCase();
-        const matchCount = inputWords.filter(word => itemText.includes(word)).length;
-        const density = matchCount / inputWords.length;
-        return { ...item, score: matchCount, density };
-    });
-
-    return scored
-        .filter(item => item.score >= 1)
-        .sort((a, b) => b.density - a.density)
-        .slice(0, 3);
-};
-
-// LLM + RAG Analysis using Gemini
-const analyzeWithGemini = async (headline: string, content: string) => {
-    const retrievedExamples = retrieveContext(headline + " " + content);
-
-    const ragContext = retrievedExamples.length > 0
-        ? `Here are ${retrievedExamples.length} relevant examples from the knowledge base to guide your analysis:\n\n` +
-          retrievedExamples.map((ex, i) =>
-            `Example ${i + 1}:\n  Text: "${ex.text}"\n  Label: ${ex.label}\n  Reasoning: ${ex.reasoning}`
-          ).join('\n\n')
-        : 'No direct matches found in the knowledge base. Analyze based on linguistic and factual indicators alone.';
-
-    const prompt = `You are an expert AI fact-checking system specializing in detecting fake news and misinformation. Your task is to analyze a news article and classify it as REAL or FAKE with a detailed breakdown.
-
-${ragContext}
-
----
-
-Now analyze this article:
-HEADLINE: "${headline}"
-CONTENT: "${content}"
-
-Respond ONLY with a valid JSON object (no markdown, no explanation outside the JSON) in this exact format:
-{
-  "isLikelyFake": true or false,
-  "confidenceScore": <number between 40 and 99>,
-  "sourceCredibility": <number between 0 and 100>,
-  "sensationalismScore": <number between 0 and 100>,
-  "manipulativeScore": <number between 0 and 100>,
-  "objectivityScore": <number between 0 and 100>,
-  "verdict": "DECEPTIVE" or "VERIFIED",
-  "analysisReason": "<2-3 sentence explanation of your verdict based on the article's language, claims, source, and any knowledge base matches>"
-}
-
-Guidelines:
-- sensationalismScore: How much clickbait/dramatized language is used (high = more sensational)
-- manipulativeScore: Use of emotionally charged or politically biased language (high = more manipulative)
-- objectivityScore: Presence of factual, neutral, and cited language (high = more objective)
-- sourceCredibility: How credible the cited source/publication appears (high = more credible)
-- If content is in a regional language (Hindi, Hinglish, etc.), still analyze the claims and tone`;
-
-    const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
-        safetySettings: [
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-        ] as any,
-        generationConfig: {
-            responseMimeType: "application/json"
-        }
-    });
-
-    const result = await model.generateContent(prompt);
-    
-    let responseText: string;
-    try {
-        responseText = result.response.text().trim();
-    } catch {
-        console.warn('⚠️ Gemini blocked response — safety filter triggered');
-        return {
-            isLikelyFake: true,
-            confidenceScore: 85,
-            sourceCredibility: 10,
-            sensationalismScore: 90,
-            manipulativeScore: 80,
-            objectivityScore: 15,
-            verdict: "DECEPTIVE",
-            analysisReason: "Content flagged by AI safety filters — contains unverifiable claims typical of misinformation."
-        };
-    }
-
-    console.log('🤖 Gemini raw response:', responseText.substring(0, 400));
-    
-    try {
-        return JSON.parse(responseText);
-    } catch (parseError) {
-        // Fallback or attempt to extract just in case it included markdown unexpectedly
-        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            return JSON.parse(jsonMatch[0]);
-        }
-        throw new Error('JSON: No valid JSON found. Raw: ' + responseText.substring(0, 100));
-    }
-};
+// Initialize the Agent
+const agent = new FakeNewsAgent(
+    process.env.GROQ_API_KEY || '',
+    process.env.HUGGINGFACEHUB_API_TOKEN || ''
+);
+agent.initialize().then(() => {
+    console.log('✅ TruthLens Agent Ready');
+});
 
 app.get('/', (req: Request, res: Response) => {
-    res.json({ message: 'TruthLens RAG + LLM Engine is running ✅' });
+    res.json({ message: 'TruthLens LangChain + RAG Engine is running ✅' });
 });
 
 app.post('/api/analyze', async (req: Request, res: Response) => {
-    const { headline, content } = req.body;
+    const { headline, content, sourceUrl } = req.body;
     if (!headline || !content) {
         return res.status(400).json({ error: 'Headline and content are required' });
     }
 
     try {
-        const analysis = await analyzeWithGemini(headline, content);
+        const analysis = await agent.analyze(headline, content, sourceUrl);
 
         let savedAnalysis;
         try {
@@ -169,28 +58,87 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
         } catch (dbError) {
             console.error('DB Logging failed (non-fatal):', dbError);
             savedAnalysis = {
-                id: 'mock-' + Date.now(),
-                headline,
-                content,
                 ...analysis,
+                id: 'mock-' + Date.now(),
                 createdAt: new Date().toISOString()
             };
         }
 
         res.json({ 
             success: true, 
-            data: { ...savedAnalysis, analysisReason: analysis.analysisReason, verdict: analysis.verdict }
+            data: { 
+                ...savedAnalysis, 
+                analysisReason: analysis.analysisReason, 
+                verdict: analysis.verdict,
+                sentiment: analysis.sentiment,
+                sourceName: analysis.sourceName
+            }
         });
     } catch (error: any) {
         const msg = error?.message || 'Unknown error';
         console.error('❌ LLM Analysis error:', msg);
-        if (msg.includes('API_KEY') || msg.includes('API key')) {
-            return res.status(500).json({ error: 'Invalid or missing GEMINI_API_KEY in .env file.' });
-        }
-        if (msg.includes('JSON')) {
-            return res.status(500).json({ error: 'LLM returned unexpected response format. Try again.' });
-        }
         return res.status(500).json({ error: 'LLM analysis failed: ' + msg });
+    }
+});
+
+app.post('/api/chat', async (req, res) => {
+    try {
+        const { message, history, originalAnalysis } = req.body;
+        const response = await agent.chat(message, history, originalAnalysis);
+        res.json({ success: true, response });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Evaluation Endpoint for 50% Requirement
+app.get('/api/evaluate', async (req: Request, res: Response) => {
+    const datasetPath = path.join(__dirname, 'dataset.json');
+    try {
+        const data = fs.readFileSync(datasetPath, 'utf8');
+        const dataset = JSON.parse(data).slice(0, 10); // Test on first 10 for speed, user can increase
+        
+        console.log(`🧪 Running evaluation on ${dataset.length} articles...`);
+        
+        let results = [];
+        let tp = 0, tn = 0, fp = 0, fn = 0;
+
+        for (const item of dataset) {
+            const analysis = await agent.analyze(item.text.substring(0, 50), item.text);
+            const predictedLabel = analysis.isLikelyFake ? 'FAKE' : 'REAL';
+            const actualLabel = item.label;
+
+            if (predictedLabel === 'FAKE' && actualLabel === 'FAKE') tp++;
+            else if (predictedLabel === 'REAL' && actualLabel === 'REAL') tn++;
+            else if (predictedLabel === 'FAKE' && actualLabel === 'REAL') fp++;
+            else if (predictedLabel === 'REAL' && actualLabel === 'FAKE') fn++;
+
+            results.push({
+                text: item.text.substring(0, 100) + '...',
+                actual: actualLabel,
+                predicted: predictedLabel,
+                match: predictedLabel === actualLabel
+            });
+        }
+
+        const accuracy = (tp + tn) / dataset.length;
+        const precision = tp / (tp + fp) || 0;
+        const recall = tp / (tp + fn) || 0;
+        const f1 = 2 * (precision * recall) / (precision + recall) || 0;
+
+        res.json({
+            success: true,
+            metrics: {
+                totalTested: dataset.length,
+                accuracy: Math.round(accuracy * 100),
+                precision: Math.round(precision * 100),
+                recall: Math.round(recall * 100),
+                f1: Math.round(f1 * 100)
+            },
+            details: results
+        });
+    } catch (error: any) {
+        res.status(500).json({ error: 'Evaluation failed: ' + error.message });
     }
 });
 
@@ -208,5 +156,4 @@ app.get('/api/history', async (req: Request, res: Response) => {
 
 app.listen(PORT, () => {
     console.log(`🚀 TruthLens server running on http://localhost:${PORT}`);
-    console.log(`🤖 LLM: Gemini 2.0 Flash | RAG: ${KNOWLEDGE_BASE.length} knowledge entries`);
 });
