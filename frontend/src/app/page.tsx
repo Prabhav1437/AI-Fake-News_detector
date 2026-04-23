@@ -1,472 +1,431 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShieldCheck, 
   AlertTriangle, 
-  Sparkles, 
   Search, 
-  BarChart3, 
-  History, 
   Info,
-  ChevronRight,
-  TrendingDown,
-  TrendingUp,
-  BrainCircuit
+  BrainCircuit,
+  Shield,
+  Layers,
+  Sun,
+  Moon,
+  MessageSquare,
+  Plus,
+  Send,
+  History,
+  X,
+  User,
+  Bot
 } from 'lucide-react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
-import { analyzeArticle, getHistory } from '@/lib/api';
+import { analyzeArticle, getHistory, chatWithAgent } from '@/lib/api';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+interface ChatSession {
+  id: string;
+  headline: string;
+  result: any;
+  messages: Message[];
+  createdAt: string;
+}
+
 export default function Dashboard() {
+  // UI State
+  const [isDark, setIsDark] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [errorText, setErrorText] = useState<string | null>(null);
+  const [isChatMode, setIsChatMode] = useState(false);
+
+  // Data State
   const [headline, setHeadline] = useState('');
   const [content, setContent] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [history, setHistory] = useState<any[]>([]);
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchHistory();
+    if (typeof window !== 'undefined') {
+      const savedTheme = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = savedTheme || (prefersDark ? 'dark' : 'light');
+      setIsDark(theme === 'dark');
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+      
+      const savedSessions = localStorage.getItem('chat_sessions');
+      if (savedSessions) setSessions(JSON.parse(savedSessions));
+    }
   }, []);
 
-  const fetchHistory = async () => {
-    try {
-      const res = await getHistory();
-      if (res.success) setHistory(res.data);
-    } catch (err) {
-      console.error("Failed to fetch history:", err);
+  useEffect(() => {
+    localStorage.setItem('chat_sessions', JSON.stringify(sessions));
+  }, [sessions]);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
+  }, [activeSessionId, sessions]);
+
+  const toggleTheme = () => {
+    const newTheme = !isDark ? 'dark' : 'light';
+    setIsDark(!isDark);
+    document.documentElement.classList.toggle('dark', !isDark);
+    localStorage.setItem('theme', newTheme);
   };
 
-  const [errorText, setErrorText] = useState<string | null>(null);
+  const handleNewChat = () => {
+    setIsChatMode(false);
+    setActiveSessionId(null);
+    setHeadline('');
+    setContent('');
+    setSourceUrl('');
+    setErrorText(null);
+  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleStartScan = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setResult(null);
     setErrorText(null);
 
     try {
-      const res = await analyzeArticle(headline, content);
+      const res = await analyzeArticle(headline, content, sourceUrl);
       if (res.success) {
-        setResult(res.data);
-        fetchHistory();
+        const newSession: ChatSession = {
+          id: res.data.id || Math.random().toString(36).substring(7),
+          headline: headline,
+          result: res.data,
+          messages: [],
+          createdAt: new Date().toISOString()
+        };
+        setSessions([newSession, ...sessions]);
+        setActiveSessionId(newSession.id);
+        setIsChatMode(true);
       } else {
-        setErrorText(res.error || "Failed to analyze article.");
+        setErrorText(res.error || "Analysis failed.");
       }
     } catch (err: any) {
-      if (err.response && err.response.data && err.response.data.error) {
-        setErrorText(err.response.data.error);
-      } else {
-        setErrorText("Network or server error occurred. Please try again.");
-      }
+      setErrorText("Intelligence scan failed. Connection unstable.");
     } finally {
       setLoading(false);
     }
   };
 
-  const renderConfidenceChart = (score: number, isFake: boolean) => {
-    const data = {
-      datasets: [
-        {
-          data: [score, 100 - score],
-          backgroundColor: [isFake ? '#ef4444' : '#10b981', 'rgba(255, 255, 255, 0.1)'],
-          borderWidth: 0,
-          borderRadius: 5,
-        },
-      ],
-    };
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || chatLoading || !activeSessionId) return;
 
+    const currentSession = sessions.find(s => s.id === activeSessionId);
+    if (!currentSession) return;
+
+    const userMsg = chatInput;
+    setChatInput('');
+    
+    // Optimistic update
+    const updatedSessions = sessions.map(s => 
+      s.id === activeSessionId 
+        ? { ...s, messages: [...s.messages, { role: 'user', content: userMsg } as Message] } 
+        : s
+    );
+    setSessions(updatedSessions);
+    setChatLoading(true);
+
+    try {
+      const res = await chatWithAgent(userMsg, currentSession.messages, currentSession.result);
+      if (res.success) {
+        setSessions(prev => prev.map(s => 
+          s.id === activeSessionId 
+            ? { ...s, messages: [...s.messages, { role: 'assistant', content: res.response } as Message] } 
+            : s
+        ));
+      }
+    } catch (err) {
+      console.error("Chat failed:", err);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const selectSession = (id: string) => {
+    setActiveSessionId(id);
+    setIsChatMode(true);
+  };
+
+  const renderTrustCircle = (score: number) => {
+    const color = score > 70 ? '#22c55e' : '#ef4444'; // Green-500 : Red-500
+    const data = {
+      datasets: [{
+        data: [score, 100 - score],
+        backgroundColor: [color, isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'],
+        borderWidth: 0,
+        borderRadius: 20,
+      }],
+    };
     return (
-      <div className="relative w-32 h-32 mx-auto">
-        <Doughnut 
-          data={data} 
-          options={{ 
-            cutout: '75%', 
-            plugins: { legend: { display: false }, tooltip: { enabled: false } },
-            maintainAspectRatio: false 
-          }} 
-        />
-        <div className="absolute inset-0 flex items-center justify-center font-bold text-xl">
+      <div className="relative w-20 h-20 mx-auto">
+        <Doughnut data={data} options={{ cutout: '85%', plugins: { legend: { display: false }, tooltip: { enabled: false } }, maintainAspectRatio: false }} />
+        <div className="absolute inset-0 flex items-center justify-center font-bold text-xs text-foreground">
           {Math.round(score)}%
         </div>
       </div>
     );
   };
 
+  const activeSession = sessions.find(s => s.id === activeSessionId);
+
   return (
-    <div className="min-h-screen p-4 md:p-8 max-w-7xl mx-auto space-y-12">
-      {/* Background Blobs */}
-      <div className="blob w-[500px] h-[500px] bg-primary/20 top-[-200px] left-[-200px]" />
-      <div className="blob w-[400px] h-[400px] bg-accent/20 bottom-[-100px] right-[-100px] animation-delay-2000" />
-      <div className="blob w-[300px] h-[300px] bg-indigo-500/10 top-[20%] right-[10%] animation-delay-4000" />
-
-      {/* Header */}
-      <nav className="flex flex-col md:flex-row items-center justify-between pb-8 border-b border-glass-border gap-6">
-        <div className="flex items-center gap-4">
-          <div className="bg-primary/20 p-3 rounded-2xl shadow-inner shadow-primary/30 backdrop-blur-md">
-            <ShieldCheck className="w-10 h-10 text-primary" />
+    <div className="flex h-screen bg-background text-foreground overflow-hidden font-inter transition-colors duration-300">
+      {/* Sidebar */}
+      <aside className="w-80 border-r border-glass-border flex flex-col bg-background/50 backdrop-blur-xl hidden md:flex">
+        <div className="p-6 space-y-6">
+          <div className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-foreground" />
+            <h1 className="text-xl font-black tracking-tighter">TruthLens.</h1>
           </div>
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-white via-blue-200 to-indigo-300 bg-clip-text text-transparent italic">
-              TruthLens<span className="not-italic text-primary">AI</span>
-            </h1>
-            <p className="text-sm text-slate-400 font-medium">State-of-the-Art Misinformation Intelligence</p>
-          </div>
+          <button 
+            onClick={handleNewChat}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-glass-border hover:bg-foreground/5 transition-all text-xs font-bold uppercase tracking-widest"
+          >
+            New Deep Scan
+            <Plus className="w-4 h-4" />
+          </button>
         </div>
-        <div className="flex gap-2">
-          <div className="flex items-center bg-white/5 border border-glass-border px-4 py-2 rounded-full">
-            <div className="w-2 h-2 bg-success rounded-full animate-pulse mr-2" />
-            <span className="text-xs font-semibold text-slate-300">Live Analysis Engine Active</span>
+        
+        <div className="flex-1 overflow-y-auto px-4 space-y-2 custom-scrollbar">
+          <div className="px-2 mb-4">
+            <p className="text-[10px] font-bold text-foreground/30 uppercase tracking-[0.2em]">Scan History</p>
           </div>
+          {sessions.map(s => (
+            <button
+              key={s.id}
+              onClick={() => selectSession(s.id)}
+              className={`w-full text-left p-4 rounded-xl transition-all border group ${activeSessionId === s.id ? 'bg-foreground/5 border-glass-border' : 'border-transparent hover:bg-foreground/5'}`}
+            >
+              <p className="text-xs font-bold truncate mb-1">{s.headline}</p>
+              <div className="flex justify-between items-center text-[10px] text-foreground/40 font-medium">
+                <span>{s.result.verdict}</span>
+                <span>{new Date(s.createdAt).toLocaleDateString()}</span>
+              </div>
+            </button>
+          ))}
         </div>
-      </nav>
 
-      {/* Stats Summary Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: 'Network Confidence', value: '99.8%', color: 'text-primary', icon: BrainCircuit },
-          { label: 'Scanned Sources', value: '2.4M+', color: 'text-accent', icon: Search },
-          { label: 'Daily Verifications', value: '42.1k', color: 'text-success', icon: TrendingUp },
-          { label: 'Fake Trends Info', value: '89.2%', color: 'text-danger', icon: AlertTriangle },
-        ].map((stat, i) => (
-          <div key={i} className="glass-panel p-4 flex items-center gap-4 hover:border-primary/20 transition-all cursor-default group">
-            <div className={`p-2 rounded-lg bg-black/20 ${stat.color} group-hover:scale-110 transition-transform`}>
-              <stat.icon className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{stat.label}</p>
-              <p className={`text-xl font-bold ${stat.color}`}>{stat.value}</p>
-            </div>
-          </div>
-        ))}
-      </div>
+        <div className="p-6 border-t border-glass-border flex justify-between items-center">
+           <button onClick={toggleTheme} className="p-2 rounded-lg border border-glass-border hover:bg-foreground/5">
+             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+           </button>
+           <span className="text-[10px] font-bold text-foreground/20 uppercase tracking-widest">v1.2.0-STABLE</span>
+        </div>
+      </aside>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Input Panel */}
-        <div className="lg:col-span-8 space-y-8">
-          <AnimatePresence>
-            {errorText && (
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }} 
-                animate={{ opacity: 1, y: 0 }} 
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-danger/20 border border-danger/50 p-4 rounded-xl flex items-center gap-3 backdrop-blur-md"
-              >
-                <AlertTriangle className="w-5 h-5 flex-shrink-0 text-danger" />
-                <p className="text-sm font-semibold text-slate-200">{errorText}</p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <section className="glass-panel p-6 md:p-10 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-8 opacity-5">
-               <Sparkles className="w-40 h-40" />
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col relative overflow-hidden">
+        {/* Mobile Header */}
+        <header className="md:hidden p-4 border-b border-glass-border flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4" />
+              <h1 className="text-lg font-black tracking-tighter">TruthLens.</h1>
             </div>
-            
-            <div className="mb-8 relative z-10">
-              <h2 className="text-2xl font-bold flex items-center gap-3 mb-2">
-                <BrainCircuit className="text-primary w-7 h-7" />
-                Neural Verification Lab
-              </h2>
-              <p className="text-slate-400 text-sm max-w-xl">
-                Deploying multi-layered linguistic analysis, sensationalism detection, and manipulative pattern recognition to verify journalistic integrity.
-              </p>
-            </div>
+            <button onClick={handleNewChat} className="p-2 rounded-lg border border-glass-border"><Plus className="w-4 h-4" /></button>
+        </header>
 
-            <form onSubmit={handleSubmit} className="space-y-8 relative z-10">
-              <div className="space-y-3">
-                <label className="text-sm font-bold text-slate-400 uppercase tracking-widest pl-1">Article Headline</label>
-                <input 
-                  type="text" 
-                  value={headline}
-                  onChange={(e) => setHeadline(e.target.value)}
-                  placeholder="e.g. Breaking: Mysterious lights spotted over Tokyo harbor..."
-                  className="w-full px-5 py-4 bg-black/40 border-glass-border text-lg focus:ring-2 focus:ring-primary/20 transition-all shadow-xl"
-                  required
-                />
-              </div>
-              <div className="space-y-3">
-                <label className="text-sm font-bold text-slate-400 uppercase tracking-widest pl-1">Primary Content</label>
-                <textarea 
-                  rows={8}
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder="Paste the full article body for deep semantic analysis..."
-                  className="w-full px-5 py-4 bg-black/40 border-glass-border text-base focus:ring-2 focus:ring-primary/20 transition-all shadow-xl resize-none"
-                  required
-                />
-              </div>
-              
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white/5 p-4 rounded-2xl border border-glass-border">
-                <div className="flex items-center gap-3 text-slate-400">
-                  <Info className="w-4 h-4" />
-                  <span className="text-xs">Estimated analysis time: &lt; 2.4s</span>
+        <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar" ref={scrollRef}>
+          {!isChatMode ? (
+            <div className="flex-1 flex items-center justify-center p-6">
+              <div className="max-w-2xl w-full space-y-12 py-12">
+                <div className="text-center space-y-4">
+                  <div className="flex justify-center mb-6">
+                    <div className="p-4 bg-foreground/5 border border-glass-border rounded-3xl">
+                       <ShieldCheck className="w-12 h-12" />
+                    </div>
+                  </div>
+                  <h2 className="text-4xl font-black tracking-tighter">Initiate Intelligence Scan</h2>
+                  <p className="text-foreground/40 text-sm max-w-sm mx-auto">Analyze the integrity of news headlines and content through our Neural Verification Engine.</p>
                 </div>
-                <div className="flex gap-4 w-full sm:w-auto">
-                  <button 
-                    type="button" 
-                    onClick={() => {setHeadline(''); setContent(''); setResult(null);}}
-                    className="flex-1 sm:flex-none px-6 py-3 rounded-xl border border-glass-border hover:bg-white/10 transition-all font-semibold text-sm"
-                  >
-                    Reset
-                  </button>
+
+                <form onSubmit={handleStartScan} className="glass-panel p-8 space-y-8">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest ml-1">Headline</label>
+                      <input 
+                        type="text" 
+                        value={headline}
+                        onChange={(e) => setHeadline(e.target.value)}
+                        placeholder="Enter the primary headline..."
+                        className="w-full px-5 py-4 text-base"
+                        required
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest ml-1">Source (Optional)</label>
+                        <input 
+                          type="text" 
+                          value={sourceUrl}
+                          onChange={(e) => setSourceUrl(e.target.value)}
+                          placeholder="source-news.com"
+                          className="w-full px-4 py-3 text-sm"
+                        />
+                      </div>
+                      <div className="flex items-end pb-1">
+                        <div className="flex items-center gap-2 text-foreground/20 text-[10px] font-bold uppercase ml-2">
+                          <Info className="w-3 h-3" />
+                          <span>Latency Target: &lt; 2.4s</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest ml-1">Article Body</label>
+                      <textarea 
+                        rows={6}
+                        value={content}
+                        onChange={(e) => setContent(e.target.value)}
+                        placeholder="Paste article text here for analysis..."
+                        className="w-full px-5 py-4 text-base resize-none"
+                        required
+                      />
+                    </div>
+                  </div>
+
                   <button 
                     type="submit"
                     disabled={loading}
-                    className="flex-1 sm:flex-none px-10 py-3 bg-gradient-to-br from-primary via-indigo-600 to-accent rounded-xl font-bold shadow-xl shadow-primary/30 hover:shadow-primary/50 hover:translate-y-[-2px] active:translate-y-[1px] transition-all disabled:opacity-50 disabled:translate-y-0 text-white"
+                    className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all disabled:opacity-30 active:scale-[0.98] ${
+                      isDark ? 'bg-white text-black' : 'bg-black text-white'
+                    }`}
                   >
-                    {loading ? (
-                      <span className="flex items-center gap-2">
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Analyzing...
-                      </span>
-                    ) : 'Initiate Deep Scan'}
+                    {loading ? 'Processing Neural Signals...' : 'Execute Deep Scan'}
                   </button>
+                  {errorText && <p className="text-center text-xs font-bold text-red-500/80">{errorText}</p>}
+                </form>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 opacity-30">
+                   {[
+                     { title: "Logic Check", icon: BrainCircuit },
+                     { title: "RAG Evidence", icon: Search },
+                     { title: "Domain Audit", icon: Shield }
+                   ].map((item, i) => (
+                     <div key={i} className="flex flex-col items-center gap-2 p-4 border border-glass-border rounded-2xl">
+                        <item.icon className="w-5 h-5" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">{item.title}</span>
+                     </div>
+                   ))}
                 </div>
               </div>
-            </form>
-          </section>
-
-          {/* Results Area */}
-          <AnimatePresence>
-            {result && (
-              <motion.div 
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="grid grid-cols-1 md:grid-cols-3 gap-6"
-              >
-                {/* Main Verdict Card */}
-                <div className="glass-panel p-8 md:col-span-2 space-y-6 relative overflow-hidden">
-                  <div className={`absolute top-0 right-0 w-32 h-32 blur-[80px] -mr-16 -mt-16 ${result.isLikelyFake ? 'bg-danger/40' : 'bg-success/40'}`} />
-                  
-                  <div className="flex items-start justify-between relative z-10">
-                    <div>
-                      <h3 className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">Intelligence Verdict</h3>
-                      <h4 className={`text-4xl font-black italic tracking-tighter ${result.isLikelyFake ? 'text-danger' : 'text-success'}`}>
-                        {result.isLikelyFake ? 'DECEPTIVE' : 'VERIFIED'}
-                      </h4>
-                      {result.detectedSource && (
-                        <div className="mt-2 flex items-center gap-2">
-                          <span className="text-[10px] text-slate-500 uppercase font-black tracking-tighter">Recognized Source:</span>
-                          <span className="text-xs font-bold text-primary px-2 py-0.5 bg-primary/10 rounded-full border border-primary/20">
-                            {result.detectedSource}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <div className={`p-5 rounded-2xl shadow-xl ${result.isLikelyFake ? 'bg-danger/20 text-danger border border-danger/30' : 'bg-success/20 text-success border border-success/30'}`}>
-                      {result.isLikelyFake ? <AlertTriangle className="w-10 h-10" /> : <ShieldCheck className="w-10 h-10" />}
+            </div>
+          ) : activeSession && (
+            <div className="flex-1 flex flex-col h-full">
+              {/* Analysis Header */}
+              <div className="p-8 border-b border-glass-border bg-background/50 backdrop-blur sticky top-0 z-10">
+                <div className="max-w-4xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold text-foreground/30 uppercase tracking-[0.3em]">Neural Verdict</p>
+                    <h2 className={`text-5xl font-black italic tracking-tighter leading-none ${activeSession.result.isLikelyFake ? 'text-red-500' : 'text-green-500'}`}>
+                      {activeSession.result.verdict}
+                    </h2>
+                    <div className="flex gap-4 pt-2">
+                       <span className={`text-[10px] font-bold py-1 px-3 border rounded-full ${activeSession.result.isLikelyFake ? 'border-red-500/20 text-red-500/60' : 'border-green-500/20 text-green-500/60'}`}>
+                         Source: {activeSession.result.sourceName}
+                       </span>
+                       <span className="text-[10px] font-bold py-1 px-3 border border-glass-border rounded-full text-foreground/60">Confidence: {activeSession.result.confidenceScore}%</span>
                     </div>
                   </div>
-
-                  <div className="space-y-4 relative z-10">
-                    <p className="text-slate-300 text-lg leading-relaxed font-medium">
-                      {result.analysisReason || (result.isLikelyFake 
-                        ? "Our neural engine detected multiple markers of sensationalism and manipulative language typically associated with misinformation." 
-                        : "High semantic consistency and neutral linguistic markers suggest this article adheres to standard journalistic practices.")}
-                    </p>
-                    
-                    <div className="w-full pt-4 space-y-3">
-                      <div className="flex justify-between items-end">
-                        <span className="text-sm font-bold text-slate-400">Scan Confidence</span>
-                        <span className="text-3xl font-black text-white">{result.confidenceScore.toFixed(1)}%</span>
-                      </div>
-                      <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden border border-white/5 p-[2px]">
-                        <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: `${result.confidenceScore}%` }}
-                          transition={{ duration: 1, ease: "easeOut" }}
-                          className={`h-full rounded-full shadow-[0_0_15px] ${result.isLikelyFake ? 'bg-danger shadow-danger/50' : 'bg-success shadow-success/50'}`}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="pt-4 border-t border-glass-border flex justify-between items-center">
-                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Verification ID: {result.id}</p>
-                     <button 
-                        onClick={() => alert(`Generating TruthLens Intelligence Report for ID: ${result.id}...`)}
-                        className="text-xs font-bold text-white bg-white/10 px-4 py-2 rounded-xl border border-glass-border hover:bg-white/20 transition-all flex items-center gap-2"
-                     >
-                       <TrendingUp className="w-3 h-3" />
-                       Download Analysis PDF
-                     </button>
-                  </div>
-                </div>
-
-                {/* Source Score Card */}
-                <div className="glass-panel p-8 flex flex-col items-center justify-between text-center group">
-                  <h3 className="text-slate-400 text-xs font-bold uppercase tracking-widest self-start">Integrity Score</h3>
-                  <div className="relative py-6">
-                    {renderConfidenceChart(result.sourceCredibility, result.isLikelyFake)}
-                    <div className="mt-4">
-                      <p className={`text-sm font-bold py-2 px-4 rounded-xl inline-block transition-all ${result.sourceCredibility > 70 ? 'bg-success/20 text-success border border-success/20' : 'bg-warning/20 text-warning border border-warning/20 group-hover:bg-warning/30'}`}>
-                        {result.sourceCredibility > 70 ? 'High Trust Factor' : 'Low Factual Origin'}
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-[10px] text-slate-500 font-medium">Analysis based on domain history and citation patterns.</p>
-                </div>
-
-                {/* Detail Analysis Metrics */}
-                <div className="glass-panel p-8 md:col-span-3 space-y-8">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-bold flex items-center gap-2">
-                       <BarChart3 className="text-primary w-5 h-5" />
-                       Linguistic Fingerprint
-                    </h3>
-                    <div className="text-xs bg-white/5 px-3 py-1.5 rounded-full border border-glass-border font-mono text-slate-400">
-                      METRIC_SCAN_1024_COMPLETE
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-10">
-                    {[
-                      { label: 'Manipulative Tone', score: result.manipulativeScore, color: 'bg-warning', icon: TrendingDown },
-                      { label: 'Sensationalism', score: result.sensationalismScore, color: 'bg-accent', icon: Sparkles },
-                      { label: 'Objectivity Index', score: result.objectivityScore, color: 'bg-success', icon: Info },
-                    ].map((metric, i) => (
-                      <div key={i} className="space-y-4">
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2">
-                            <metric.icon className="w-4 h-4 text-slate-500" />
-                            <span className="text-sm font-bold text-slate-300">{metric.label}</span>
-                          </div>
-                          <span className="text-lg font-black text-white">{metric.score}%</span>
-                        </div>
-                        <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
-                          <motion.div 
-                            initial={{ width: 0 }}
-                            animate={{ width: `${metric.score}%` }}
-                            transition={{ duration: 1.2, delay: i * 0.1 }}
-                            className={`h-full ${metric.color} shadow-[0_0_10px] shadow-current opacity-80`}
-                          />
-                        </div>
-                        <p className="text-[10px] text-slate-500 leading-tight">
-                          {metric.score > 50 ? 'Significantly above baseline threshold.' : 'Within standard journalistic variance.'}
+                  <div className={`flex items-center gap-8 px-8 py-5 glass-panel border-t-4 transition-all bg-foreground/[0.02] backdrop-blur-md ${activeSession.result.isLikelyFake ? 'border-t-red-500' : 'border-t-green-500'} shadow-2xl shadow-black/5`}>
+                     <div className="space-y-1">
+                        <p className="text-[10px] font-black text-foreground/40 uppercase tracking-[0.2em]">Source Trust</p>
+                        <p className={`text-sm font-black uppercase tracking-widest ${activeSession.result.sourceCredibility > 70 ? 'text-green-500' : 'text-red-500'}`}>
+                          {activeSession.result.sourceCredibility > 70 ? 'Verified' : 'Flagged'}
                         </p>
-                      </div>
-                    ))}
+                     </div>
+                     <div className="w-px h-10 bg-glass-border" />
+                     {renderTrustCircle(activeSession.result.sourceCredibility)}
                   </div>
                 </div>
-                
-                {/* Ethics Alert */}
-                <div className="md:col-span-3 p-6 rounded-2xl bg-gradient-to-r from-warning/10 to-transparent border border-warning/20 text-warning/80 text-sm flex gap-4 backdrop-blur-sm">
-                  <Info className="flex-shrink-0 w-6 h-6" />
-                  <div className="space-y-1">
-                    <p className="font-bold">Journalistic Integrity Notice</p>
-                    <p className="text-xs opacity-70">
-                      Automated analysis serves as a cognitive aid, not a definitive verdict. Always cross-reference with primary documents, verified eyewitness accounts, and professional fact-checking organizations like Poynter or Reuters.
+              </div>
+
+              {/* Chat Thread */}
+              <div className="flex-1 p-8 space-y-8 max-w-4xl mx-auto w-full">
+                {/* Initial Analysis Result */}
+                <div className="flex gap-4">
+                  <div className={`w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 ${activeSession.result.isLikelyFake ? 'bg-red-500/10 border-red-500/20 text-red-500' : 'bg-green-500/10 border-green-500/20 text-green-500'}`}>
+                    {activeSession.result.isLikelyFake ? <AlertTriangle className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
+                  </div>
+                  <div className="space-y-4 max-w-2xl">
+                    <p className="text-sm font-bold text-foreground/40 uppercase tracking-widest">TruthLens Analysis</p>
+                    <p className="text-lg font-light leading-relaxed text-foreground/80">
+                      {activeSession.result.analysisReason}
                     </p>
                   </div>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
 
-          {/* How it works Section */}
-          <section className="glass-panel p-10 space-y-8 bg-gradient-to-b from-white/[0.02] to-transparent">
-             <div className="text-center space-y-2">
-                <h3 className="text-2xl font-bold italic tracking-tight">How TruthLens Operates</h3>
-                <p className="text-slate-500 text-sm">Transparency in AI processing leads to better decision making.</p>
-             </div>
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {[
-                  { title: "Semantic Parsing", desc: "Our engine deconstructs sentences to find inconsistencies in factual claims and emotional weights.", icon: Info },
-                  { title: "Linguistic Fingerprinting", desc: "Comparing prose against known misinformation datasets containing over 50,000 labeled articles.", icon: BrainCircuit },
-                  { title: "Domain Auditing", desc: "Cross-referencing claims against established trust-registered news networks and scientific journals.", icon: Search }
-                ].map((step, i) => (
-                  <div key={i} className="space-y-3 relative">
-                    <div className="text-4xl font-black text-primary/10 absolute -top-4 -left-2 select-none">0{i+1}</div>
-                    <div className="flex items-center gap-2 font-bold text-slate-200 relative z-10">
-                       <step.icon className="w-5 h-5 text-primary" />
-                       {step.title}
+                {activeSession.messages.map((msg, i) => (
+                  <div key={i} className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+                    {msg.role === 'assistant' && (
+                      <div className="w-8 h-8 rounded-lg bg-foreground/5 border border-glass-border flex items-center justify-center shrink-0">
+                        <Bot className="w-4 h-4" />
+                      </div>
+                    )}
+                    <div className={`p-5 rounded-2xl max-w-2xl text-sm leading-relaxed ${
+                      msg.role === 'user' 
+                        ? 'bg-foreground/5 border border-glass-border font-medium' 
+                        : 'font-light text-foreground/80'
+                    }`}>
+                      {msg.content}
                     </div>
-                    <p className="text-xs text-slate-500 leading-relaxed relative z-10">{step.desc}</p>
+                    {msg.role === 'user' && (
+                      <div className="w-8 h-8 rounded-lg bg-foreground text-background flex items-center justify-center shrink-0">
+                        <User className="w-4 h-4" />
+                      </div>
+                    )}
                   </div>
                 ))}
-             </div>
-          </section>
-        </div>
+                
+                {chatLoading && (
+                  <div className="flex gap-4 animate-pulse">
+                    <div className="w-8 h-8 rounded-lg bg-foreground/5 border border-glass-border flex items-center justify-center shrink-0">
+                      <Bot className="w-4 h-4" />
+                    </div>
+                    <div className="h-10 w-20 bg-foreground/5 rounded-xl border border-glass-border" />
+                  </div>
+                )}
+              </div>
 
-        {/* Sidebar History */}
-        <aside className="lg:col-span-4 space-y-8">
-          <div className="glass-panel p-8 sticky top-8">
-            <h3 className="text-xl font-bold mb-8 flex items-center gap-3">
-              <History className="w-6 h-6 text-primary" />
-              Intelligence Log
-            </h3>
-            <div className="space-y-5 max-h-[800px] overflow-y-auto pr-3 custom-scrollbar">
-              {history.length === 0 ? (
-                <div className="py-12 flex flex-col items-center justify-center text-center space-y-4 opacity-50">
-                   <div className="p-4 rounded-full bg-white/5 border border-white/5">
-                      <Search className="w-8 h-8" />
-                   </div>
-                   <p className="text-sm font-medium text-slate-400">Your scan history <br/> is currently empty.</p>
-                </div>
-              ) : (
-                history.map((item, i) => (
-                  <motion.div 
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    key={item.id} 
-                    className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3 hover:bg-white/[0.08] hover:border-primary/20 transition-all group cursor-pointer shadow-sm"
+              {/* Chat Input Box */}
+              <div className="p-8 border-t border-glass-border bg-background/50 backdrop-blur sticky bottom-0">
+                <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto relative">
+                  <input 
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder="Ask about this article's verification details..."
+                    className="w-full pl-6 pr-16 py-4 bg-foreground/5 border-glass-border focus:bg-foreground/10"
+                  />
+                  <button 
+                    type="submit"
+                    disabled={chatLoading}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-foreground text-background hover:opacity-80 transition-all disabled:opacity-30"
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <p className="text-sm font-bold text-slate-200 line-clamp-2 group-hover:text-primary transition-colors leading-snug">{item.headline}</p>
-                      <div className={`p-1.5 rounded-lg flex-shrink-0 ${item.isLikelyFake ? 'bg-danger/10 text-danger border border-danger/10' : 'bg-success/10 text-success border border-success/10'}`}>
-                        {item.isLikelyFake ? <AlertTriangle className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center text-[11px] font-bold text-slate-500">
-                      <div className="flex items-center gap-1.5">
-                         <div className={`w-1.5 h-1.5 rounded-full ${item.isLikelyFake ? 'bg-danger' : 'bg-success'}`} />
-                         <span>{new Date(item.createdAt).toLocaleDateString()}</span>
-                      </div>
-                      <span className={`px-2 py-0.5 rounded-md ${item.isLikelyFake ? 'bg-danger/10 text-danger' : 'bg-success/10 text-success'}`}>
-                        {Math.round(item.confidenceScore)}% Confidence
-                      </span>
-                    </div>
-                  </motion.div>
-                ))
-              )}
+                    <Send className="w-4 h-4" />
+                  </button>
+                </form>
+              </div>
             </div>
-          </div>
-
-          <div className="glass-panel p-10 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/10 relative overflow-hidden group">
-            <div className="absolute -bottom-4 -right-4 transition-transform group-hover:scale-110">
-               <TrendingUp className="w-32 h-32 opacity-10 text-primary rotate-12" />
-            </div>
-            <h3 className="font-black text-primary mb-4 flex items-center gap-2 text-lg italic tracking-tight">
-              <Sparkles className="w-5 h-5" />
-              Dataset Pulse
-            </h3>
-            <p className="text-xs text-slate-400 mb-6 leading-relaxed font-medium">Monitoring misinformation trends across 26k+ global news vectors.</p>
-            <div className="space-y-4">
-              {[
-                { label: 'Real Article Vectors', value: '12,482', color: 'text-success' },
-                { label: 'Deceptive Vectors', value: '13,819', color: 'text-danger' },
-                { label: 'Uncertain/Mixed', value: '1,204', color: 'text-warning' }
-              ].map((item, i) => (
-                <div key={i} className="flex justify-between items-center bg-black/20 p-3 rounded-xl border border-white/5">
-                  <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">{item.label}</span>
-                  <span className={`${item.color} font-black font-mono`}>{item.value}</span>
-                </div>
-              ))}
-            </div>
-            <button className="w-full mt-6 py-2.5 bg-primary/20 hover:bg-primary/30 text-primary text-[10px] font-black uppercase tracking-widest rounded-xl transition-all border border-primary/20">
-               View Live Heatmap
-            </button>
-          </div>
-        </aside>
-      </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
-
