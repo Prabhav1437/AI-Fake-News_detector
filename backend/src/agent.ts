@@ -84,7 +84,7 @@ export class FakeNewsAgent {
 
     // 3. Multi-Signal Analysis Prompt
     const prompt = PromptTemplate.fromTemplate(`
-You are TruthLens AI, the world's most advanced misinformation detection system. 
+You are VeriNews AI, the world's most advanced misinformation detection system. 
 Analyze the provided news article using linguistic fingerprinting, source reputation, and historical evidence.
 
 ### INPUT DATA:
@@ -155,7 +155,7 @@ Final Output MUST be valid JSON. Be decisive and prioritize high-confidence mark
     }
 
     const chatPrompt = PromptTemplate.fromTemplate(`
-You are TruthLens AI, an expert misinformation analyst. You are currently in a follow-up discussion regarding the following analysis:
+You are VeriNews AI, an expert misinformation analyst. You are currently in a follow-up discussion regarding the following analysis:
 
 ### ORIGINAL ANALYSIS:
 - Headline: {headline}
