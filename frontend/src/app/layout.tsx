@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TruthLens AI | Fake News & Misinformation Detector",
+  title: "VeriNews AI | Fake News & Misinformation Detector",
   description: "AI-powered factual consistency analysis and source credibility dashboard.",
 };
 
