@@ -5,25 +5,7 @@ import {
   ShieldCheck, 
   Link as LinkIcon, 
   FileText, 
-  BrainCircuit, 
-  Activity, 
-  TextCursorInput, 
-  GitCompareArrows, 
-  FileCheck2, 
-  Cpu, 
-  Fingerprint, 
-  ShieldAlert, 
-  Code2, 
-  BookOpen, 
-  Mail, 
-  Layers, 
-  Target, 
-  Files, 
-  Heart, 
-  ScanLine,
-  ChevronRight,
-  TrendingUp,
-  Shield
+  ScanLine
 } from 'lucide-react';
 import ParticleNewspaper from '@/components/ParticleNewspaper';
 import Link from 'next/link';
@@ -271,7 +253,7 @@ export default function LandingPage() {
           
           <div className="mt-12 pt-8 border-t border-white/10 flex flex-col items-center gap-4 text-xs font-mono text-gray-500 uppercase tracking-widest text-center">
             <p className="font-bold text-white mb-2">VeriNews AI — Because truth shouldn't be optional.</p>
-            <p>© 2026 Team TruthLens · Built with purpose, powered by AI.</p>
+            <p>© 2026 Team VeriNews AI · Built with purpose, powered by AI.</p>
           </div>
         </div>
       </footer>
