@@ -25,11 +25,11 @@ const agent = new FakeNewsAgent(
     process.env.HUGGINGFACEHUB_API_TOKEN || ''
 );
 agent.initialize().then(() => {
-    console.log('✅ TruthLens Agent Ready');
+    console.log('✅ VeriNews AI Agent Ready');
 });
 
 app.get('/', (req: Request, res: Response) => {
-    res.json({ message: 'TruthLens LangChain + RAG Engine is running ✅' });
+    res.json({ message: 'VeriNews AI LangChain + RAG Engine is running ✅' });
 });
 
 app.post('/api/analyze', async (req: Request, res: Response) => {
@@ -155,5 +155,5 @@ app.get('/api/history', async (req: Request, res: Response) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 TruthLens server running on http://localhost:${PORT}`);
+    console.log(`🚀 VeriNews AI server running on http://localhost:${PORT}`);
 });
