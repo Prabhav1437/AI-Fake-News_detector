@@ -1,75 +1,42 @@
-# AI-Powered Fake News Detector
+# VeriNews AI — Misinformation Detection Engine
 
-## Overview
-This project is an AI-powered system designed to classify news articles as **Real or Fake** using prompt-based analysis.
+VeriNews AI is a state-of-the-art misinformation detection system that leverages Large Language Models (LLMs), Retrieval-Augmented Generation (RAG), and linguistic fingerprinting to verify the integrity of news articles in real-time.
 
-The system uses Natural Language Processing (NLP) techniques such as:
-- Factual consistency analysis
-- Sentiment detection
-- Logical reasoning
-- Source credibility evaluation
+## 🚀 Key Features
 
----
+- **Deep Neural Scan**: Analyzes news for factual consistency, emotional manipulation, and logical fallacies.
+- **RAG-Powered Evidence**: Cross-references input against a historical database of 26,000+ labeled articles.
+- **Source Reputation Map**: Instant credibility scoring based on a curated map of global news domains.
+- **Interactive AI Chat**: Conversational follow-ups specialized in explaining the verification verdict.
+- **Glassmorphic UI**: High-density, interactive dashboard built for high-performance intelligence analysis.
 
-## Tech Stack
-- ChatGPT / Gemini (AI Analysis)
-- Python (Data Processing)
-- Google Forms (User Input)
-- Google Sheets (Future Dashboard)
-- CSV Dataset (Training & Testing)
+## 🛠 Tech Stack
 
----
+### Backend
+- **Framework**: Express.js with TypeScript
+- **AI Orchestration**: LangChain.js
+- **LLM**: Llama 3 (via Groq) for ultra-fast reasoning
+- **Embeddings**: HuggingFace (sentence-transformers)
+- **Vector Store**: Memory-based Vector Store for RAG
+- **Database**: Prisma ORM with SQLite (Analysis logging)
 
-## Dataset
-We collected **26000+ labeled news articles**:
-- Real news from APIs (trusted sources)
-- Fake news from public datasets/manual input
+### Frontend
+- **Framework**: Next.js 16 (App Router)
+- **Styling**: Tailwind CSS v4
+- **Animations**: Framer Motion
+- **Visualization**: Chart.js (Trust scoring)
+- **Background**: Custom Canvas-based Particle Newspaper system
 
-### Dataset Files:
-- `news_dataset.csv` → Real news
-- `fake_news_dataset.csv` → Fake news
+## 📂 Project Structure
 
----
+- `backend/`: Node.js server, AI Agent logic, and RAG implementation.
+- `frontend/`: Next.js application, interactive dashboard, and landing page.
 
-## Features
-- News article input system (Google Form)
-- AI-based classification (Real/Fake)
-- Confidence scoring (planned)
-- Reasoning-based output (planned)
-- Dataset-driven evaluation (next phase)
+## 🧪 Evaluation
 
----
-
-## AI Approach
-The system uses a **prompt-based AI model** instead of training a custom ML model.
-
-### Input:
-- News article text
-
-### Processing:
-- NLP-based prompt analysis:
-  - Factual accuracy
-  - Emotional tone
-  - Logical consistency
-  - Source credibility
-
-### Output:
-- Verdict (Real/Fake)
-- Confidence score
-- Explanation
+The system includes a dedicated evaluation endpoint (`/api/evaluate`) that tests the AI's accuracy against the core dataset.
+- **Dataset**: 26,000+ articles (Historical FAKE/REAL signatures).
+- **Target Accuracy**: >90% on labeled misinformation vectors.
 
 ---
-
-## Live Demo
-
-- Submit Article: [https://forms.gle/your-link](https://docs.google.com/forms/d/e/1FAIpQLSekTYlCbvBiw49xURxPcA24q5Yxc_x-6S25u49RNXEECJ78Jg/viewform)
-
----
-
-## Future Work
-- Accuracy evaluation using labeled dataset
-- Precision/Recall calculation
-- Source credibility scoring system
-- Google Sheets dashboard for visualization
-- Automated AI integration
----
+© 2026 Team VeriNews AI · Built with purpose, powered by AI.
