@@ -4,6 +4,7 @@
   --color-primary: var(--primary);
   --color-glass-bg: var(--glass-bg);
   --color-glass-border: var(--glass-border);
+  --color-darker: #050505;
 }
 
 :root {
@@ -36,6 +37,13 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+.glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
 .glass-panel {
   background: var(--glass-bg);
   backdrop-filter: blur(20px);
@@ -62,6 +70,41 @@ input:focus, textarea:focus {
   border-color: var(--text-muted);
   box-shadow: 0 0 0 1px var(--glass-border);
   background: var(--glass-bg);
+}
+
+/* Animations from Landing Page */
+@keyframes scrollScan {
+  0% { top: -10%; opacity: 0; }
+  50% { opacity: 1; }
+  100% { top: 110%; opacity: 0; }
+}
+
+.scan-line {
+  position: absolute;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(to right, transparent, #ffffff, transparent);
+  box-shadow: 0 0 15px #ffffff, 0 0 30px #ffffff;
+  animation: scrollScan 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.circular-chart {
+  display: block;
+  margin: 10px auto;
+  max-width: 100%;
+}
+
+.circle-bg {
+  fill: none;
+  stroke: rgba(255,255,255,0.05);
+  stroke-width: 3.8;
+}
+
+.circle {
+  fill: none;
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  transition: stroke-dasharray 2s ease-out;
 }
 
 /* Custom Monochrome Scrollbar */
