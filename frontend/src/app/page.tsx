@@ -1,431 +1,330 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState } from 'react';
 import { 
   ShieldCheck, 
-  AlertTriangle, 
-  Search, 
-  Info,
-  BrainCircuit,
-  Shield,
-  Layers,
-  Sun,
-  Moon,
-  MessageSquare,
-  Plus,
-  Send,
-  History,
-  X,
-  User,
-  Bot
+  Link as LinkIcon, 
+  FileText, 
+  BrainCircuit, 
+  Activity, 
+  TextCursorInput, 
+  GitCompareArrows, 
+  FileCheck2, 
+  Cpu, 
+  Fingerprint, 
+  ShieldAlert, 
+  Code2, 
+  BookOpen, 
+  Mail, 
+  Layers, 
+  Target, 
+  Files, 
+  Heart, 
+  ScanLine,
+  ChevronRight,
+  TrendingUp,
+  Shield
 } from 'lucide-react';
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
-import { Doughnut } from 'react-chartjs-2';
-import { analyzeArticle, getHistory, chatWithAgent } from '@/lib/api';
+import ParticleNewspaper from '@/components/ParticleNewspaper';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { analyzeArticle } from '@/lib/api';
+import { motion, AnimatePresence } from 'framer-motion';
 
-ChartJS.register(ArcElement, Tooltip, Legend);
+export default function LandingPage() {
+  const router = useRouter();
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisDone, setAnalysisDone] = useState(false);
+  const [loadingText, setLoadingText] = useState('');
+  const [inputVal, setInputVal] = useState('');
+  const [result, setResult] = useState<any>(null);
 
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-interface ChatSession {
-  id: string;
-  headline: string;
-  result: any;
-  messages: Message[];
-  createdAt: string;
-}
-
-export default function Dashboard() {
-  // UI State
-  const [isDark, setIsDark] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [errorText, setErrorText] = useState<string | null>(null);
-  const [isChatMode, setIsChatMode] = useState(false);
-
-  // Data State
-  const [headline, setHeadline] = useState('');
-  const [content, setContent] = useState('');
-  const [sourceUrl, setSourceUrl] = useState('');
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [chatInput, setChatInput] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
-
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedTheme = localStorage.getItem('theme');
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const theme = savedTheme || (prefersDark ? 'dark' : 'light');
-      setIsDark(theme === 'dark');
-      document.documentElement.classList.toggle('dark', theme === 'dark');
-      
-      const savedSessions = localStorage.getItem('chat_sessions');
-      if (savedSessions) setSessions(JSON.parse(savedSessions));
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('chat_sessions', JSON.stringify(sessions));
-  }, [sessions]);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [activeSessionId, sessions]);
-
-  const toggleTheme = () => {
-    const newTheme = !isDark ? 'dark' : 'light';
-    setIsDark(!isDark);
-    document.documentElement.classList.toggle('dark', !isDark);
-    localStorage.setItem('theme', newTheme);
-  };
-
-  const handleNewChat = () => {
-    setIsChatMode(false);
-    setActiveSessionId(null);
-    setHeadline('');
-    setContent('');
-    setSourceUrl('');
-    setErrorText(null);
-  };
-
-  const handleStartScan = async (e: React.FormEvent) => {
+  const handleAnalyze = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setErrorText(null);
+    if (!inputVal.trim()) {
+      alert("Please enter some text or drop a URL to analyze.");
+      return;
+    }
+
+    setAnalyzing(true);
+    
+    const steps = [
+      "AI is scanning for inconsistencies...",
+      "Cross-referencing 26,000+ articles...",
+      "Detecting emotional manipulation...",
+      "Evaluating logical coherence...",
+      "Generating explainable verdict..."
+    ];
+    
+    let stepIndex = 0;
+    setLoadingText(steps[stepIndex]);
+    
+    const textInterval = setInterval(() => {
+      stepIndex++;
+      if (stepIndex < steps.length) {
+        setLoadingText(steps[stepIndex]);
+      }
+    }, 600);
 
     try {
-      const res = await analyzeArticle(headline, content, sourceUrl);
+      // Actually call the API
+      const res = await analyzeArticle(inputVal.substring(0, 50), inputVal);
+      
+      clearInterval(textInterval);
       if (res.success) {
-        const newSession: ChatSession = {
+        // Save to sessions in localStorage so dashboard picks it up
+        const savedSessions = localStorage.getItem('chat_sessions');
+        const sessions = savedSessions ? JSON.parse(savedSessions) : [];
+        const newSession = {
           id: res.data.id || Math.random().toString(36).substring(7),
-          headline: headline,
+          headline: inputVal.substring(0, 50),
           result: res.data,
           messages: [],
           createdAt: new Date().toISOString()
         };
-        setSessions([newSession, ...sessions]);
-        setActiveSessionId(newSession.id);
-        setIsChatMode(true);
+        localStorage.setItem('chat_sessions', JSON.stringify([newSession, ...sessions]));
+        
+        // Redirect to dashboard
+        router.push('/dashboard');
       } else {
-        setErrorText(res.error || "Analysis failed.");
-      }
-    } catch (err: any) {
-      setErrorText("Intelligence scan failed. Connection unstable.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim() || chatLoading || !activeSessionId) return;
-
-    const currentSession = sessions.find(s => s.id === activeSessionId);
-    if (!currentSession) return;
-
-    const userMsg = chatInput;
-    setChatInput('');
-    
-    // Optimistic update
-    const updatedSessions = sessions.map(s => 
-      s.id === activeSessionId 
-        ? { ...s, messages: [...s.messages, { role: 'user', content: userMsg } as Message] } 
-        : s
-    );
-    setSessions(updatedSessions);
-    setChatLoading(true);
-
-    try {
-      const res = await chatWithAgent(userMsg, currentSession.messages, currentSession.result);
-      if (res.success) {
-        setSessions(prev => prev.map(s => 
-          s.id === activeSessionId 
-            ? { ...s, messages: [...s.messages, { role: 'assistant', content: res.response } as Message] } 
-            : s
-        ));
+        alert("Intelligence scan failed. Connection unstable.");
       }
     } catch (err) {
-      console.error("Chat failed:", err);
+      clearInterval(textInterval);
+      alert("Intelligence scan failed. Connection unstable.");
     } finally {
-      setChatLoading(false);
+      setAnalyzing(false);
     }
   };
 
-  const selectSession = (id: string) => {
-    setActiveSessionId(id);
-    setIsChatMode(true);
-  };
-
-  const renderTrustCircle = (score: number) => {
-    const color = score > 70 ? '#22c55e' : '#ef4444'; // Green-500 : Red-500
-    const data = {
-      datasets: [{
-        data: [score, 100 - score],
-        backgroundColor: [color, isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'],
-        borderWidth: 0,
-        borderRadius: 20,
-      }],
-    };
-    return (
-      <div className="relative w-20 h-20 mx-auto">
-        <Doughnut data={data} options={{ cutout: '85%', plugins: { legend: { display: false }, tooltip: { enabled: false } }, maintainAspectRatio: false }} />
-        <div className="absolute inset-0 flex items-center justify-center font-bold text-xs text-foreground">
-          {Math.round(score)}%
-        </div>
-      </div>
-    );
-  };
-
-  const activeSession = sessions.find(s => s.id === activeSessionId);
-
   return (
-    <div className="flex h-screen bg-background text-foreground overflow-hidden font-inter transition-colors duration-300">
-      {/* Sidebar */}
-      <aside className="w-80 border-r border-glass-border flex flex-col bg-background/50 backdrop-blur-xl hidden md:flex">
-        <div className="p-6 space-y-6">
-          <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-foreground" />
-            <h1 className="text-xl font-black tracking-tighter">TruthLens.</h1>
+    <div className="min-h-screen relative flex flex-col font-sans bg-black text-white">
+      
+      {/* Navbar */}
+      <nav className="fixed w-full z-50 glass border-b border-white/5 top-0 bg-black/50 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-wrap items-center justify-between h-20">
+            {/* Logo */}
+            <div className="flex items-center gap-3">
+              <ShieldCheck className="w-8 h-8 text-white" />
+              <span className="font-black text-xl md:text-2xl tracking-tight text-white uppercase">VeriNews <span className="text-gray-500">AI</span></span>
+            </div>
+            
+            {/* Desktop Links */}
+            <div className="hidden md:flex items-center space-x-8">
+              <a href="#" className="text-gray-400 hover:text-white transition-colors py-2 text-sm font-bold uppercase tracking-wider">Home</a>
+              <a href="#how-it-works" className="text-gray-400 hover:text-white transition-colors py-2 text-sm font-bold uppercase tracking-wider">How It Works</a>
+              <a href="#features" className="text-gray-400 hover:text-white transition-colors py-2 text-sm font-bold uppercase tracking-wider">Features</a>
+              <a href="#dataset" className="text-gray-400 hover:text-white transition-colors py-2 text-sm font-bold uppercase tracking-wider">Dataset</a>
+              <Link href="/dashboard" className="text-primary hover:opacity-80 transition-all py-2 text-sm font-black uppercase tracking-wider border-b-2 border-primary">Dashboard</Link>
+            </div>
+            
+            {/* CTA */}
+            <div>
+              <Link href="/dashboard" className="bg-white hover:bg-gray-200 text-black px-6 py-2 rounded-none font-bold uppercase tracking-widest transition-all text-xs md:text-sm">
+                Verify News Now
+              </Link>
+            </div>
           </div>
-          <button 
-            onClick={handleNewChat}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-glass-border hover:bg-foreground/5 transition-all text-xs font-bold uppercase tracking-widest"
-          >
-            New Deep Scan
-            <Plus className="w-4 h-4" />
-          </button>
         </div>
+      </nav>
+
+      {/* Main Content */}
+      <main className="flex-grow pt-20">
         
-        <div className="flex-1 overflow-y-auto px-4 space-y-2 custom-scrollbar">
-          <div className="px-2 mb-4">
-            <p className="text-[10px] font-bold text-foreground/30 uppercase tracking-[0.2em]">Scan History</p>
-          </div>
-          {sessions.map(s => (
-            <button
-              key={s.id}
-              onClick={() => selectSession(s.id)}
-              className={`w-full text-left p-4 rounded-xl transition-all border group ${activeSessionId === s.id ? 'bg-foreground/5 border-glass-border' : 'border-transparent hover:bg-foreground/5'}`}
-            >
-              <p className="text-xs font-bold truncate mb-1">{s.headline}</p>
-              <div className="flex justify-between items-center text-[10px] text-foreground/40 font-medium">
-                <span>{s.result.verdict}</span>
-                <span>{new Date(s.createdAt).toLocaleDateString()}</span>
-              </div>
-            </button>
-          ))}
-        </div>
+        {/* HUGE OPENING */}
+        <section className="w-full">
+            <ParticleNewspaper />
+        </section>
 
-        <div className="p-6 border-t border-glass-border flex justify-between items-center">
-           <button onClick={toggleTheme} className="p-2 rounded-lg border border-glass-border hover:bg-foreground/5">
-             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-           </button>
-           <span className="text-[10px] font-bold text-foreground/20 uppercase tracking-widest">v1.2.0-STABLE</span>
-        </div>
-      </aside>
+        {/* Action Panel */}
+        <section id="analyze-section" className="relative py-20 px-4">
+          <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-white/5 rounded-full blur-[150px] pointer-events-none"></div>
 
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col relative overflow-hidden">
-        {/* Mobile Header */}
-        <header className="md:hidden p-4 border-b border-glass-border flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <Shield className="w-4 h-4" />
-              <h1 className="text-lg font-black tracking-tighter">TruthLens.</h1>
-            </div>
-            <button onClick={handleNewChat} className="p-2 rounded-lg border border-glass-border"><Plus className="w-4 h-4" /></button>
-        </header>
+          <div className="max-w-4xl mx-auto text-center relative z-10">
+            <h2 className="text-4xl md:text-6xl font-black uppercase tracking-tight mb-6">
+              Unmask the Truth
+            </h2>
+            <p className="text-gray-400 text-lg md:text-xl font-mono mb-12 max-w-2xl mx-auto">
+              {'>'} Input source material. Initializing NLP context parsing. Connect to global LLM fact-checking arrays.
+            </p>
 
-        <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar" ref={scrollRef}>
-          {!isChatMode ? (
-            <div className="flex-1 flex items-center justify-center p-6">
-              <div className="max-w-2xl w-full space-y-12 py-12">
-                <div className="text-center space-y-4">
-                  <div className="flex justify-center mb-6">
-                    <div className="p-4 bg-foreground/5 border border-glass-border rounded-3xl">
-                       <ShieldCheck className="w-12 h-12" />
-                    </div>
-                  </div>
-                  <h2 className="text-4xl font-black tracking-tighter">Initiate Intelligence Scan</h2>
-                  <p className="text-foreground/40 text-sm max-w-sm mx-auto">Analyze the integrity of news headlines and content through our Neural Verification Engine.</p>
-                </div>
-
-                <form onSubmit={handleStartScan} className="glass-panel p-8 space-y-8">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest ml-1">Headline</label>
-                      <input 
-                        type="text" 
-                        value={headline}
-                        onChange={(e) => setHeadline(e.target.value)}
-                        placeholder="Enter the primary headline..."
-                        className="w-full px-5 py-4 text-base"
-                        required
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest ml-1">Source (Optional)</label>
-                        <input 
-                          type="text" 
-                          value={sourceUrl}
-                          onChange={(e) => setSourceUrl(e.target.value)}
-                          placeholder="source-news.com"
-                          className="w-full px-4 py-3 text-sm"
-                        />
-                      </div>
-                      <div className="flex items-end pb-1">
-                        <div className="flex items-center gap-2 text-foreground/20 text-[10px] font-bold uppercase ml-2">
-                          <Info className="w-3 h-3" />
-                          <span>Latency Target: &lt; 2.4s</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest ml-1">Article Body</label>
-                      <textarea 
-                        rows={6}
-                        value={content}
-                        onChange={(e) => setContent(e.target.value)}
-                        placeholder="Paste article text here for analysis..."
-                        className="w-full px-5 py-4 text-base resize-none"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <button 
-                    type="submit"
-                    disabled={loading}
-                    className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all disabled:opacity-30 active:scale-[0.98] ${
-                      isDark ? 'bg-white text-black' : 'bg-black text-white'
-                    }`}
-                  >
-                    {loading ? 'Processing Neural Signals...' : 'Execute Deep Scan'}
-                  </button>
-                  {errorText && <p className="text-center text-xs font-bold text-red-500/80">{errorText}</p>}
-                </form>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 opacity-30">
-                   {[
-                     { title: "Logic Check", icon: BrainCircuit },
-                     { title: "RAG Evidence", icon: Search },
-                     { title: "Domain Audit", icon: Shield }
-                   ].map((item, i) => (
-                     <div key={i} className="flex flex-col items-center gap-2 p-4 border border-glass-border rounded-2xl">
-                        <item.icon className="w-5 h-5" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">{item.title}</span>
-                     </div>
-                   ))}
-                </div>
-              </div>
-            </div>
-          ) : activeSession && (
-            <div className="flex-1 flex flex-col h-full">
-              {/* Analysis Header */}
-              <div className="p-8 border-b border-glass-border bg-background/50 backdrop-blur sticky top-0 z-10">
-                <div className="max-w-4xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-bold text-foreground/30 uppercase tracking-[0.3em]">Neural Verdict</p>
-                    <h2 className={`text-5xl font-black italic tracking-tighter leading-none ${activeSession.result.isLikelyFake ? 'text-red-500' : 'text-green-500'}`}>
-                      {activeSession.result.verdict}
-                    </h2>
-                    <div className="flex gap-4 pt-2">
-                       <span className={`text-[10px] font-bold py-1 px-3 border rounded-full ${activeSession.result.isLikelyFake ? 'border-red-500/20 text-red-500/60' : 'border-green-500/20 text-green-500/60'}`}>
-                         Source: {activeSession.result.sourceName}
-                       </span>
-                       <span className="text-[10px] font-bold py-1 px-3 border border-glass-border rounded-full text-foreground/60">Confidence: {activeSession.result.confidenceScore}%</span>
-                    </div>
-                  </div>
-                  <div className={`flex items-center gap-8 px-8 py-5 glass-panel border-t-4 transition-all bg-foreground/[0.02] backdrop-blur-md ${activeSession.result.isLikelyFake ? 'border-t-red-500' : 'border-t-green-500'} shadow-2xl shadow-black/5`}>
-                     <div className="space-y-1">
-                        <p className="text-[10px] font-black text-foreground/40 uppercase tracking-[0.2em]">Source Trust</p>
-                        <p className={`text-sm font-black uppercase tracking-widest ${activeSession.result.sourceCredibility > 70 ? 'text-green-500' : 'text-red-500'}`}>
-                          {activeSession.result.sourceCredibility > 70 ? 'Verified' : 'Flagged'}
-                        </p>
-                     </div>
-                     <div className="w-px h-10 bg-glass-border" />
-                     {renderTrustCircle(activeSession.result.sourceCredibility)}
-                  </div>
-                </div>
-              </div>
-
-              {/* Chat Thread */}
-              <div className="flex-1 p-8 space-y-8 max-w-4xl mx-auto w-full">
-                {/* Initial Analysis Result */}
-                <div className="flex gap-4">
-                  <div className={`w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 ${activeSession.result.isLikelyFake ? 'bg-red-500/10 border-red-500/20 text-red-500' : 'bg-green-500/10 border-green-500/20 text-green-500'}`}>
-                    {activeSession.result.isLikelyFake ? <AlertTriangle className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
-                  </div>
-                  <div className="space-y-4 max-w-2xl">
-                    <p className="text-sm font-bold text-foreground/40 uppercase tracking-widest">TruthLens Analysis</p>
-                    <p className="text-lg font-light leading-relaxed text-foreground/80">
-                      {activeSession.result.analysisReason}
-                    </p>
-                  </div>
-                </div>
-
-                {activeSession.messages.map((msg, i) => (
-                  <div key={i} className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                    {msg.role === 'assistant' && (
-                      <div className="w-8 h-8 rounded-lg bg-foreground/5 border border-glass-border flex items-center justify-center shrink-0">
-                        <Bot className="w-4 h-4" />
-                      </div>
-                    )}
-                    <div className={`p-5 rounded-2xl max-w-2xl text-sm leading-relaxed ${
-                      msg.role === 'user' 
-                        ? 'bg-foreground/5 border border-glass-border font-medium' 
-                        : 'font-light text-foreground/80'
-                    }`}>
-                      {msg.content}
-                    </div>
-                    {msg.role === 'user' && (
-                      <div className="w-8 h-8 rounded-lg bg-foreground text-background flex items-center justify-center shrink-0">
-                        <User className="w-4 h-4" />
-                      </div>
-                    )}
-                  </div>
-                ))}
+            {/* Input Action Box */}
+            <div className="bg-white/[0.02] p-2 md:p-3 rounded-none border border-white/20 shadow-2xl transition-all focus-within:border-white/50">
+              <form onSubmit={handleAnalyze} className="relative h-full flex flex-col bg-black">
+                <textarea 
+                  value={inputVal}
+                  onChange={(e) => setInputVal(e.target.value)}
+                  rows={4} 
+                  className="w-full bg-transparent text-white placeholder-gray-600 border-none outline-none resize-none p-6 text-lg font-mono focus:ring-0"
+                  placeholder="[PASTE TEXT OR URL TO ANALYZE]"
+                ></textarea>
                 
-                {chatLoading && (
-                  <div className="flex gap-4 animate-pulse">
-                    <div className="w-8 h-8 rounded-lg bg-foreground/5 border border-glass-border flex items-center justify-center shrink-0">
-                      <Bot className="w-4 h-4" />
-                    </div>
-                    <div className="h-10 w-20 bg-foreground/5 rounded-xl border border-glass-border" />
+                <div className="flex flex-col md:flex-row items-center justify-between border-t border-white/10 bg-white/[0.02] px-4 py-3 gap-4">
+                  <div className="flex gap-4 text-gray-500 w-full md:w-auto font-mono text-sm uppercase">
+                    <button type="button" className="hover:text-white transition-colors flex items-center gap-2 px-2"><LinkIcon className="w-4 h-4" /> URL</button>
+                    <button type="button" className="hover:text-white transition-colors flex items-center gap-2 px-2"><FileText className="w-4 h-4" /> Document</button>
                   </div>
-                )}
+                  <button type="submit" disabled={analyzing} className="bg-white w-full md:w-auto hover:bg-gray-300 disabled:opacity-50 text-black px-8 py-3 font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3">
+                    {analyzing ? 'Processing...' : 'Run Scan'} <ScanLine className="w-5 h-5" />
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+
+        {/* Capabilities Section */}
+        <section id="features" className="py-32 relative bg-black">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center gap-4 mb-16">
+              <div className="w-8 md:w-12 h-1 bg-white"></div>
+              <h2 className="text-3xl md:text-5xl font-black uppercase tracking-widest">What Makes VeriNews AI Different</h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <ProtocolCard num="01" title="LLM-Powered Reasoning" desc="Goes beyond keyword matching. Our AI understands context, narrative structure, and intent — the same way a fact-checker would." />
+              <ProtocolCard num="02" title="Trained on 26,000+ Articles" desc="Validated on a massive labeled dataset of real and fake news spanning multiple domains, languages, and publication types." />
+              <ProtocolCard num="03" title="Not Just True or False" desc="VeriNews AI tells you why. Every verdict comes with a breakdown of reasoning — transparent, traceable, and human-readable." />
+              <ProtocolCard num="04" title="Detects Emotional Manipulation" desc="Identifies biased framing, fear-mongering language, and emotionally charged rhetoric — tactics commonly used to spread misinformation." />
+            </div>
+          </div>
+        </section>
+
+        {/* Process Map */}
+        <section id="how-it-works" className="py-32 relative bg-[#0a0a0a] border-y border-white/5 overflow-hidden">
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[length:40px_40px]"></div>
+          
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
+            <h2 className="text-4xl md:text-5xl font-black uppercase tracking-widest mb-24">Four Steps to the Truth</h2>
+            
+            <div className="flex flex-col md:flex-row relative gap-12 md:gap-8 justify-between mx-auto items-start">
+              <div className="hidden md:block absolute top-8 left-[10%] right-[10%] h-[1px] bg-white/20 z-0"></div>
+
+              <ProcessStep num="01" title="Paste or Link" desc="Drop in a news snippet, full article, or URL. No formatting needed." />
+              <ProcessStep num="02" title="Deep Analysis Begins" desc="Our LLM checks for logical consistency, narrative bias, and cross-references known misinformation patterns." />
+              <ProcessStep num="03" title="Pattern Cross-Check" desc="The article is matched against trained data from 26,000+ labeled sources to identify familiar fake news signatures." />
+              <ProcessStep num="04" title="Instant Verdict" desc="Get a clear REAL or FAKE verdict, a confidence score, and a detailed reasoning breakdown — all in seconds." />
+            </div>
+          </div>
+        </section>
+
+        {/* Stats */}
+        <section id="dataset" className="py-32 relative bg-black">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+              
+              <div>
+                <h2 className="text-4xl md:text-5xl font-black uppercase tracking-widest mb-8">By the Numbers</h2>
+                <div className="border-l-4 border-white pl-8 py-2">
+                  <p className="text-xl md:text-2xl text-gray-400 font-mono leading-relaxed">
+                    Validated on a massive scale to guarantee high-confidence results when it matters most.
+                  </p>
+                </div>
               </div>
 
-              {/* Chat Input Box */}
-              <div className="p-8 border-t border-glass-border bg-background/50 backdrop-blur sticky bottom-0">
-                <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto relative">
-                  <input 
-                    type="text"
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    placeholder="Ask about this article's verification details..."
-                    className="w-full pl-6 pr-16 py-4 bg-foreground/5 border-glass-border focus:bg-foreground/10"
-                  />
-                  <button 
-                    type="submit"
-                    disabled={chatLoading}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-foreground text-background hover:opacity-80 transition-all disabled:opacity-30"
-                  >
-                    <Send className="w-4 h-4" />
-                  </button>
-                </form>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white/5 p-8 border border-white/10">
+                  <div className="text-4xl md:text-5xl font-black mb-2 text-white">26k+</div>
+                  <div className="text-xs text-gray-500 font-mono uppercase tracking-[0.2em] block mt-4">Articles in Training Dataset</div>
+                </div>
+                <div className="bg-white/5 p-8 border border-white/10">
+                  <div className="text-4xl md:text-5xl font-black mb-2 text-white">90%+</div>
+                  <div className="text-xs text-green-500 font-mono uppercase tracking-[0.2em] block mt-4">Model Accuracy Rate</div>
+                </div>
+                <div className="bg-white/5 p-8 border border-white/10">
+                  <div className="text-4xl md:text-5xl font-black mb-2 text-white">4+</div>
+                  <div className="text-xs text-white/40 font-mono uppercase tracking-[0.2em] block mt-4">Analysis Dimensions</div>
+                </div>
+                <div className="bg-white/5 p-8 border border-white/10">
+                  <div className="text-4xl md:text-5xl font-black mb-2 text-white">~3s</div>
+                  <div className="text-xs text-white/40 font-mono uppercase tracking-[0.2em] block mt-4">Avg Response Time</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-[#0a0a0a] py-16 border-t border-white/20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-8">
+            <div className="flex items-center gap-3">
+              <ShieldCheck className="w-8 h-8 text-white" />
+              <span className="font-black text-2xl tracking-widest text-white uppercase">VeriNews <span className="text-gray-600">AI</span></span>
+            </div>
+            
+            <div className="flex flex-wrap justify-center gap-8 font-mono text-sm uppercase tracking-widest text-gray-500">
+              <a href="#" className="hover:text-white transition-colors">GitHub Repo</a>
+              <a href="#" className="hover:text-white transition-colors">README</a>
+              <a href="#dataset" className="hover:text-white transition-colors">Dataset</a>
+              <a href="#" className="hover:text-white transition-colors">Contact Us</a>
+            </div>
+          </div>
+          
+          <div className="mt-12 pt-8 border-t border-white/10 flex flex-col items-center gap-4 text-xs font-mono text-gray-500 uppercase tracking-widest text-center">
+            <p className="font-bold text-white mb-2">VeriNews AI — Because truth shouldn't be optional.</p>
+            <p>© 2026 Team TruthLens · Built with purpose, powered by AI.</p>
+          </div>
+        </div>
+      </footer>
+
+      {/* Global Loading Overlay */}
+      <AnimatePresence>
+        {analyzing && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex flex-col items-center justify-center select-none"
+          >
+            <div className="w-[400px] bg-black border border-white/20 p-8 shadow-2xl">
+              <div className="font-black uppercase text-2xl tracking-widest mb-6 border-b border-white/10 pb-4 text-white">System Override</div>
+              <div className="font-mono text-sm text-gray-400 space-y-4">
+                 <div className="flex justify-between items-center">
+                    <span>Connection:</span>
+                    <span className="text-green-500">SECURE</span>
+                 </div>
+                 <div className="flex justify-between items-center">
+                    <span>Routing:</span>
+                    <span className="text-gray-300">GEMINI/NLP</span>
+                 </div>
+                 <div className="mt-6 pt-4 border-t border-white/10">
+                   <span className="text-white tracking-widest uppercase">[{loadingText}]</span>
+                   <span className="animate-pulse ml-1">_</span>
+                 </div>
               </div>
             </div>
-          )}
-        </div>
-      </main>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
+}
+
+function ProtocolCard({ num, title, desc }: { num: string, title: string, desc: string }) {
+  return (
+    <div className="bg-white/[0.02] border border-white/10 p-8 hover:bg-white/[0.05] transition-colors">
+      <div className="text-gray-600 font-black text-4xl mb-6">{num}</div>
+      <h3 className="text-xl font-black text-white uppercase tracking-widest mb-4">{title}</h3>
+      <p className="text-gray-400 font-mono text-sm leading-relaxed">{desc}</p>
+    </div>
+  )
+}
+
+function ProcessStep({ num, title, desc }: { num: string, title: string, desc: string }) {
+  return (
+     <div className="relative z-10 flex flex-col items-center text-center w-full max-w-[220px]">
+        <div className="w-16 h-16 bg-black border-2 border-white flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(255,255,255,0.1)]">
+           <span className="font-black text-xl text-white">{num}</span>
+        </div>
+        <h4 className="text-sm font-bold uppercase tracking-widest mb-3 text-white">{title}</h4>
+        <p className="text-xs text-gray-400 font-mono leading-relaxed">{desc}</p>
+     </div>
+  )
 }
