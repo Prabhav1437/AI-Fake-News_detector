@@ -193,7 +193,7 @@ export default function Dashboard() {
         <div className="p-6 space-y-6">
           <div className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-foreground" />
-            <h1 className="text-xl font-black tracking-tighter">TruthLens.</h1>
+            <h1 className="text-xl font-black tracking-tighter">VeriNews AI.</h1>
           </div>
           <button 
             onClick={handleNewChat}
@@ -237,7 +237,7 @@ export default function Dashboard() {
         <header className="md:hidden p-4 border-b border-glass-border flex justify-between items-center">
             <div className="flex items-center gap-2">
               <Shield className="w-4 h-4" />
-              <h1 className="text-lg font-black tracking-tighter">TruthLens.</h1>
+              <h1 className="text-lg font-black tracking-tighter">VeriNews AI.</h1>
             </div>
             <button onClick={handleNewChat} className="p-2 rounded-lg border border-glass-border"><Plus className="w-4 h-4" /></button>
         </header>
@@ -364,7 +364,7 @@ export default function Dashboard() {
                     {activeSession.result.isLikelyFake ? <AlertTriangle className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
                   </div>
                   <div className="space-y-4 max-w-2xl">
-                    <p className="text-sm font-bold text-foreground/40 uppercase tracking-widest">TruthLens Analysis</p>
+                    <p className="text-sm font-bold text-foreground/40 uppercase tracking-widest">VeriNews AI Analysis</p>
                     <p className="text-lg font-light leading-relaxed text-foreground/80">
                       {activeSession.result.analysisReason}
                     </p>
