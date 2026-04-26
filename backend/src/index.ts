@@ -13,11 +13,12 @@ const prisma = new PrismaClient();
 const PORT = process.env.PORT || 5001;
 
 app.use(cors({
-    origin: '*', 
+    origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // Initialize the Agent
 const agent = new FakeNewsAgent(
@@ -32,9 +33,59 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 app.post('/api/analyze', async (req: Request, res: Response) => {
-    const { headline, content, sourceUrl } = req.body;
+    let { headline, content, sourceUrl, screenshotBase64 } = req.body;
+
+    // --- Optional Screenshot Vision Extraction ---
+    if (screenshotBase64) {
+        try {
+            console.log('🖼️  Screenshot received — extracting text via Groq vision...');
+            const Groq = require('groq-sdk');
+            const groqVision = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+            const visionResponse = await groqVision.chat.completions.create({
+                model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+                messages: [
+                    {
+                        role: 'user',
+                        content: [
+                            {
+                                type: 'text',
+                                text: 'Extract only the news headline and article body text from this screenshot. Return just the raw text, nothing else.'
+                            },
+                            {
+                                type: 'image_url',
+                                image_url: {
+                                    url: `data:image/jpeg;base64,${screenshotBase64}`
+                                }
+                            }
+                        ]
+                    }
+                ],
+                max_tokens: 2048
+            });
+
+            const extractedText: string = visionResponse.choices?.[0]?.message?.content?.trim() || '';
+            console.log(`✅ Vision extraction complete (${extractedText.length} chars)`);
+
+            if (extractedText) {
+                const lines = extractedText.split('\n').filter((l: string) => l.trim());
+                // Populate headline from first line if not provided by user
+                if (!headline && lines.length > 0) headline = lines[0].substring(0, 200);
+                // Merge or set content
+                if (!content) {
+                    content = extractedText;
+                } else {
+                    content = `[Screenshot extracted]:\n${extractedText}\n\n[User provided content]:\n${content}`;
+                }
+            }
+        } catch (visionErr: any) {
+            console.error('❌ Vision extraction failed (non-fatal):', visionErr?.message || visionErr);
+            // Fall through — if user also typed text, continue with that
+        }
+    }
+
     if (!headline || !content) {
-        return res.status(400).json({ error: 'Headline and content are required' });
+        return res.status(400).json({ error: 'Headline and content are required (or upload a screenshot to extract them)' });
     }
 
     try {
@@ -63,11 +114,11 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
             };
         }
 
-        res.json({ 
-            success: true, 
-            data: { 
-                ...savedAnalysis, 
-                analysisReason: analysis.analysisReason, 
+        res.json({
+            success: true,
+            data: {
+                ...savedAnalysis,
+                analysisReason: analysis.analysisReason,
                 verdict: analysis.verdict,
                 sentiment: analysis.sentiment,
                 sourceName: analysis.sourceName
@@ -96,9 +147,9 @@ app.get('/api/evaluate', async (req: Request, res: Response) => {
     try {
         const data = fs.readFileSync(datasetPath, 'utf8');
         const dataset = JSON.parse(data).slice(0, 10); // Test on first 10 for speed, user can increase
-        
+
         console.log(`🧪 Running evaluation on ${dataset.length} articles...`);
-        
+
         let results = [];
         let tp = 0, tn = 0, fp = 0, fn = 0;
 
