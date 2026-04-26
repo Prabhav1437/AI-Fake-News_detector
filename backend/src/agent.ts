@@ -9,6 +9,7 @@ import { z } from "zod";
 import fs from "fs";
 import path from "path";
 import { getSourceInfo } from "./knowledge_map";
+import { tavily } from "@tavily/core";
 
 // Schema for the output
 const analysisSchema = z.object({
@@ -28,6 +29,7 @@ export class FakeNewsAgent {
   private model: ChatGroq;
   private vectorStore: MemoryVectorStore | null = null;
   private embeddings: GoogleGenerativeAIEmbeddings;
+  private tavilyClient: any;
 
   constructor(apiKey: string) {
     this.model = new ChatGroq({
@@ -40,6 +42,8 @@ export class FakeNewsAgent {
       apiKey: process.env.GEMINI_API_KEY || "",
       modelName: "gemini-embedding-001",
     });
+
+    this.tavilyClient = tavily({ apiKey: process.env.TAVILY_API_KEY || "" });
   }
 
   private isInitializing = false;
@@ -82,6 +86,22 @@ export class FakeNewsAgent {
         ).join("\n\n")
       : "No direct historical matches found.";
 
+    // 2.5. Real-time Search (Tavily)
+    console.log("🌐 Performing real-time web search via Tavily...");
+    let tavilyContext = "No relevant web search results found.";
+    let tavilyResults: any[] = [];
+    try {
+        const searchResult = await this.tavilyClient.search(headline, { maxResults: 3 });
+        tavilyResults = searchResult.results || [];
+        if (tavilyResults.length > 0) {
+            tavilyContext = tavilyResults.map((r: any) => 
+                `[Source: ${r.title}]\nContent: ${r.content}\nURL: ${r.url}`
+            ).join("\n\n");
+        }
+    } catch (tavilyErr) {
+        console.error("⚠️ Tavily search failed:", tavilyErr);
+    }
+
     // 3. Multi-Signal Analysis Prompt
     const prompt = PromptTemplate.fromTemplate(`
 You are VeriNews AI, the world's most advanced misinformation detection system. 
@@ -94,12 +114,15 @@ Analyze the provided news article using linguistic fingerprinting, source reputa
 ### EVIDENCE & REPUTATION:
 - Source category: {sourceCategory} (Trust Score: {sourceTrustScore}/100)
 - Source Flagged: {isFlagged}
+- Web search results for this news: 
+{tavilyContext}
 - Historical Evidence (RAG): 
 {ragContext}
 
 ### ANALYSIS PROTOCOL:
-1. **Linguistic markers**: Identify emotional manipulation, clickbait tactics, and logical fallacies.
-2. **Contextual Alignment**: Check if the article aligns with or contradicts the historical evidence provided.
+1. **Real-time Verification**: Use the provided web search results to verify the news. If web search confirms the news, mark as REAL. If web search contradicts it, mark as FAKE. If no relevant results found, use your own knowledge and the historical evidence.
+2. **Linguistic markers**: Identify emotional manipulation, clickbait tactics, and logical fallacies.
+3. **Contextual Alignment**: Check if the article aligns with or contradicts the historical evidence and search results provided.
 3. **Confidence Calculation**:
    - If Source is Trusted AND Evidence aligns -> Confidence 90-99%.
    - If Source is Flagged AND Evidence contradicts -> Confidence 90-99%.
@@ -123,6 +146,7 @@ Final Output MUST be valid JSON. Be decisive and prioritize high-confidence mark
       sourceTrustScore: sourceInfo.trustScore,
       sourceCategory: sourceInfo.category,
       isFlagged: sourceInfo.isFlagged ? "YES" : "NO",
+      tavilyContext,
       ragContext,
       format_instructions: parser.getFormatInstructions()
     });
@@ -133,6 +157,7 @@ Final Output MUST be valid JSON. Be decisive and prioritize high-confidence mark
     if (sourceInfo.trustScore > 90 && !result.isLikelyFake) finalConfidence = Math.max(finalConfidence, 98);
 
     console.log(`✅ Analysis Complete. Confidence: ${finalConfidence}%`);
+    console.log(`🏁 FINAL VERDICT: ${result.verdict} | Confidence: ${finalConfidence}% | Tavily Results: ${JSON.stringify(tavilyResults)}`);
 
     return {
       ...result,
