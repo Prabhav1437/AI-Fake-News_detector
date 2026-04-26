@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState } from 'react';
-import { 
-  ShieldCheck, 
-  Link as LinkIcon, 
-  FileText, 
+import {
+  ShieldCheck,
+  Link as LinkIcon,
+  FileText,
   ScanLine
 } from 'lucide-react';
 import ParticleNewspaper from '@/components/ParticleNewspaper';
@@ -31,7 +31,7 @@ export default function LandingPage() {
     }
 
     setAnalyzing(true);
-    
+
     const steps = [
       "AI is scanning for inconsistencies...",
       "Cross-referencing 26,000+ articles...",
@@ -39,10 +39,10 @@ export default function LandingPage() {
       "Evaluating logical coherence...",
       "Generating explainable verdict..."
     ];
-    
+
     let stepIndex = 0;
     setLoadingText(steps[stepIndex]);
-    
+
     const textInterval = setInterval(() => {
       stepIndex++;
       if (stepIndex < steps.length) {
@@ -53,7 +53,7 @@ export default function LandingPage() {
     try {
       // Actually call the API
       const res = await analyzeArticle(inputVal.substring(0, 50), inputVal);
-      
+
       clearInterval(textInterval);
       if (res.success) {
         // Save to sessions in localStorage so dashboard picks it up
@@ -67,7 +67,7 @@ export default function LandingPage() {
           createdAt: new Date().toISOString()
         };
         localStorage.setItem('chat_sessions', JSON.stringify([newSession, ...sessions]));
-        
+
         // Redirect to dashboard
         router.push('/dashboard');
       } else {
@@ -83,7 +83,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen relative flex flex-col font-sans bg-black text-white">
-      
+
       {/* Navbar */}
       <nav className="fixed w-full z-50 glass border-b border-white/5 top-0 bg-black/50 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -93,16 +93,16 @@ export default function LandingPage() {
               <ShieldCheck className="w-8 h-8 text-white" />
               <span className="font-black text-xl md:text-2xl tracking-tight text-white uppercase">VeriNews <span className="text-gray-500">AI</span></span>
             </div>
-            
+
             {/* Desktop Links */}
             <div className="hidden md:flex items-center space-x-8">
               <a href="#" className="text-gray-400 hover:text-white transition-colors py-2 text-sm font-bold uppercase tracking-wider">Home</a>
               <a href="#how-it-works" className="text-gray-400 hover:text-white transition-colors py-2 text-sm font-bold uppercase tracking-wider">How It Works</a>
               <a href="#features" className="text-gray-400 hover:text-white transition-colors py-2 text-sm font-bold uppercase tracking-wider">Features</a>
               <a href="#dataset" className="text-gray-400 hover:text-white transition-colors py-2 text-sm font-bold uppercase tracking-wider">Dataset</a>
-              <Link href="/dashboard" className="text-primary hover:opacity-80 transition-all py-2 text-sm font-black uppercase tracking-wider border-b-2 border-primary">Dashboard</Link>
+              <Link href="/dashboard" className="text-gray-400 hover:text-white transition-all py-2 text-sm font-bold uppercase tracking-wider">Dashboard</Link>
             </div>
-            
+
             {/* CTA */}
             <div>
               <Link href="/dashboard" className="bg-white hover:bg-gray-200 text-black px-6 py-2 rounded-none font-bold uppercase tracking-widest transition-all text-xs md:text-sm">
@@ -115,47 +115,10 @@ export default function LandingPage() {
 
       {/* Main Content */}
       <main className="flex-grow pt-20">
-        
+
         {/* HUGE OPENING */}
         <section className="w-full">
             <ParticleNewspaper />
-        </section>
-
-        {/* Action Panel */}
-        <section id="analyze-section" className="relative py-20 px-4">
-          <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-white/5 rounded-full blur-[150px] pointer-events-none"></div>
-
-          <div className="max-w-4xl mx-auto text-center relative z-10">
-            <h2 className="text-4xl md:text-6xl font-black uppercase tracking-tight mb-6">
-              Unmask the Truth
-            </h2>
-            <p className="text-gray-400 text-lg md:text-xl font-mono mb-12 max-w-2xl mx-auto">
-              {'>'} Input source material. Initializing NLP context parsing. Connect to global LLM fact-checking arrays.
-            </p>
-
-            {/* Input Action Box */}
-            <div className="bg-white/[0.02] p-2 md:p-3 rounded-none border border-white/20 shadow-2xl transition-all focus-within:border-white/50">
-              <form onSubmit={handleAnalyze} className="relative h-full flex flex-col bg-black">
-                <textarea 
-                  value={inputVal}
-                  onChange={(e) => setInputVal(e.target.value)}
-                  rows={4} 
-                  className="w-full bg-transparent text-white placeholder-gray-600 border-none outline-none resize-none p-6 text-lg font-mono focus:ring-0"
-                  placeholder="[PASTE TEXT OR URL TO ANALYZE]"
-                ></textarea>
-                
-                <div className="flex flex-col md:flex-row items-center justify-between border-t border-white/10 bg-white/[0.02] px-4 py-3 gap-4">
-                  <div className="flex gap-4 text-gray-500 w-full md:w-auto font-mono text-sm uppercase">
-                    <button type="button" className="hover:text-white transition-colors flex items-center gap-2 px-2"><LinkIcon className="w-4 h-4" /> URL</button>
-                    <button type="button" className="hover:text-white transition-colors flex items-center gap-2 px-2"><FileText className="w-4 h-4" /> Document</button>
-                  </div>
-                  <button type="submit" disabled={analyzing} className="bg-white w-full md:w-auto hover:bg-gray-300 disabled:opacity-50 text-black px-8 py-3 font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3">
-                    {analyzing ? 'Processing...' : 'Run Scan'} <ScanLine className="w-5 h-5" />
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
         </section>
 
 
@@ -179,10 +142,10 @@ export default function LandingPage() {
         {/* Process Map */}
         <section id="how-it-works" className="py-32 relative bg-[#0a0a0a] border-y border-white/5 overflow-hidden">
           <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[length:40px_40px]"></div>
-          
+
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
             <h2 className="text-4xl md:text-5xl font-black uppercase tracking-widest mb-24">Four Steps to the Truth</h2>
-            
+
             <div className="flex flex-col md:flex-row relative gap-12 md:gap-8 justify-between mx-auto items-start">
               <div className="hidden md:block absolute top-8 left-[10%] right-[10%] h-[1px] bg-white/20 z-0"></div>
 
@@ -198,7 +161,7 @@ export default function LandingPage() {
         <section id="dataset" className="py-32 relative bg-black">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-              
+
               <div>
                 <h2 className="text-4xl md:text-5xl font-black uppercase tracking-widest mb-8">By the Numbers</h2>
                 <div className="border-l-4 border-white pl-8 py-2">
@@ -242,7 +205,7 @@ export default function LandingPage() {
               <ShieldCheck className="w-8 h-8 text-white" />
               <span className="font-black text-2xl tracking-widest text-white uppercase">VeriNews <span className="text-gray-600">AI</span></span>
             </div>
-            
+
             <div className="flex flex-wrap justify-center gap-8 font-mono text-sm uppercase tracking-widest text-gray-500">
               <a href="#" className="hover:text-white transition-colors">GitHub Repo</a>
               <a href="#" className="hover:text-white transition-colors">README</a>
@@ -250,7 +213,7 @@ export default function LandingPage() {
               <a href="#" className="hover:text-white transition-colors">Contact Us</a>
             </div>
           </div>
-          
+
           <div className="mt-12 pt-8 border-t border-white/10 flex flex-col items-center gap-4 text-xs font-mono text-gray-500 uppercase tracking-widest text-center">
             <p className="font-bold text-white mb-2">VeriNews AI — Because truth shouldn't be optional.</p>
             <p>© 2026 Team VeriNews AI · Built with purpose, powered by AI.</p>
@@ -261,7 +224,7 @@ export default function LandingPage() {
       {/* Global Loading Overlay */}
       <AnimatePresence>
         {analyzing && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -270,18 +233,18 @@ export default function LandingPage() {
             <div className="w-[400px] bg-black border border-white/20 p-8 shadow-2xl">
               <div className="font-black uppercase text-2xl tracking-widest mb-6 border-b border-white/10 pb-4 text-white">System Override</div>
               <div className="font-mono text-sm text-gray-400 space-y-4">
-                 <div className="flex justify-between items-center">
-                    <span>Connection:</span>
-                    <span className="text-green-500">SECURE</span>
-                 </div>
-                 <div className="flex justify-between items-center">
-                    <span>Routing:</span>
-                    <span className="text-gray-300">GEMINI/NLP</span>
-                 </div>
-                 <div className="mt-6 pt-4 border-t border-white/10">
-                   <span className="text-white tracking-widest uppercase">[{loadingText}]</span>
-                   <span className="animate-pulse ml-1">_</span>
-                 </div>
+                <div className="flex justify-between items-center">
+                  <span>Connection:</span>
+                  <span className="text-green-500">SECURE</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Routing:</span>
+                  <span className="text-gray-300">GEMINI/NLP</span>
+                </div>
+                <div className="mt-6 pt-4 border-t border-white/10">
+                  <span className="text-white tracking-widest uppercase">[{loadingText}]</span>
+                  <span className="animate-pulse ml-1">_</span>
+                </div>
               </div>
             </div>
           </motion.div>

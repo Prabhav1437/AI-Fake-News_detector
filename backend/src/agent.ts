@@ -1,5 +1,5 @@
 import { ChatGroq } from "@langchain/groq";
-import { HuggingFaceInferenceEmbeddings } from "@langchain/community/embeddings/hf";
+import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
 import { MemoryVectorStore } from "@langchain/classic/vectorstores/memory";
 import { Document } from "@langchain/core/documents";
 import { PromptTemplate } from "@langchain/core/prompts";
@@ -27,18 +27,18 @@ const parser = StructuredOutputParser.fromZodSchema(analysisSchema);
 export class FakeNewsAgent {
   private model: ChatGroq;
   private vectorStore: MemoryVectorStore | null = null;
-  private embeddings: HuggingFaceInferenceEmbeddings;
+  private embeddings: GoogleGenerativeAIEmbeddings;
 
-  constructor(apiKey: string, hfToken?: string) {
+  constructor(apiKey: string) {
     this.model = new ChatGroq({
       apiKey: apiKey,
       model: "llama-3.3-70b-versatile",
       temperature: 0.1,
     });
 
-    this.embeddings = new HuggingFaceInferenceEmbeddings({
-      apiKey: hfToken || process.env.HUGGINGFACEHUB_API_TOKEN || "",
-      model: "sentence-transformers/all-MiniLM-L6-v2",
+    this.embeddings = new GoogleGenerativeAIEmbeddings({
+      apiKey: process.env.GEMINI_API_KEY || "",
+      modelName: "gemini-embedding-001",
     });
   }
 

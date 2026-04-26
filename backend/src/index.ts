@@ -21,8 +21,7 @@ app.use(express.json());
 
 // Initialize the Agent
 const agent = new FakeNewsAgent(
-    process.env.GROQ_API_KEY || '',
-    process.env.HUGGINGFACEHUB_API_TOKEN || ''
+    process.env.GROQ_API_KEY || ''
 );
 agent.initialize().then(() => {
     console.log('✅ VeriNews AI Agent Ready');

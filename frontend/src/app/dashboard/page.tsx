@@ -294,7 +294,7 @@ export default function Dashboard() {
                         value={content}
                         onChange={(e) => setContent(e.target.value)}
                         placeholder="Paste article text here for analysis..."
-                        className="w-full px-5 py-4 text-base resize-none"
+                        className="w-full px-5 py-4 text-sm resize-none"
                         required
                       />
                     </div>

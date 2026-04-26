@@ -65,6 +65,11 @@ input, textarea {
   color: var(--foreground);
 }
 
+::placeholder {
+  color: var(--foreground);
+  opacity: 0.3;
+}
+
 input:focus, textarea:focus {
   outline: none;
   border-color: var(--text-muted);
